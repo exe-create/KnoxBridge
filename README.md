@@ -6,7 +6,7 @@ Independent Java-mod runtime/bootstrap for Project Zomboid. The project is separ
 
 This repository contains an early Windows runtime vertical slice: a public module API, a small native DLL-search bootstrap followed by a Java agent, a PZ adapter that captures the active IDs passed through `ZomboidFileSystem.loadMods(List)` and resolves their selected mod directories, SHA-256 identity, exact-hash allow/deny storage, isolated per-module class loaders, lifecycle callbacks, class-and-method patch target checks, a separate harmless example module, and reversible `ProjectZomboid64.json` setup scripts.
 
-Build with `gradlew verify`. The build targets Java 17 bytecode for compatibility, while the installed PZ copy uses a bundled Java 25 runtime. The actual 42.21 agent startup has not been live-tested.
+Build with `gradlew verify`. The build targets Java 17 bytecode for compatibility, while the installed PZ copy uses a bundled Java 25 runtime. On 2026-09-28, a normal Steam AppID launch started installed PZ 42.21.0 with the agent; it reported the correct build/runtime and applied the active-mod discovery adapter. That launch had zero enabled mods in its current context, so module discovery, trust, and module initialization remain unverified live.
 
 ## Try it as a player (Windows)
 
@@ -14,7 +14,7 @@ Download and extract `knoxbridge-runtime-0.1.0-alpha1.zip`, then double-click `K
 
 This is a user-facing alpha install and test flow, not yet a universal loader for existing Java mods. Modules must be built for the KnoxBridge API. See [Windows installation](docs/INSTALLATION.md) for the complete steps and limits.
 
-The adapter was checked offline against the installed PZ JAR signature and a transformed fixture. The actual Steam launch and in-game callback remain unverified on PZ 42.21. There is no machine-wide JAR scan, no default trust for unknown code, and no claim that Java modules are sandboxed.
+The adapter was checked offline against the installed PZ JAR signature and a transformed fixture, and its hook was applied in the live PZ 42.21.0 process. The enabled-mod callback ran but returned no IDs; a real enabled Java module has not yet been observed. There is no machine-wide JAR scan, no default trust for unknown code, and no claim that Java modules are sandboxed.
 
 ## Build and local verification
 

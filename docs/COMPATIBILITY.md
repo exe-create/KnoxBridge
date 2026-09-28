@@ -1,6 +1,6 @@
 # Compatibility and research notes
 
-The first target is PZ Build 42.21, but this repository has not yet proven runtime compatibility. The local installed game contains a PZ JSON launch definition and bundled Java 25.0.1; the local Knox Survivors source/build evidence predates 42.21 and is not runtime proof. The installed PZ JAR signature probe reports `loadMods(String)` and `loadMods(List)`; other public methods used by the adapter were inspected in that JAR. This is offline bytecode evidence, not proof the agent callback executes successfully in game.
+The installed target was live-tested on 2026-09-28 and reported PZ 42.21.0 with Java 25.0.1 during a normal Steam AppID launch. KnoxBridge's exact `loadMods(List)` transform applied and the callback ran, reporting zero active mods in that context. This verifies the bootstrap and hook application, but does not yet verify a real enabled-mod ID, candidate resolution, trust decision, or module load. Knox Survivors' current source/build evidence predates 42.21 and is not runtime proof.
 
 Public ZombieBuddy issue #53 reports that its 42.21 `ZomboidFileSystem.loadMods` hook did not bind when the method parameter changed from `ArrayList<String>` to `List<String>`. Our installed JAR independently reports the `List` descriptor. KnoxBridge targets that exact API descriptor, and its fixture passes an `ArrayList` at runtime to a method declared with `List`. It does not guess when a future PZ build changes the declared method signature.
 
