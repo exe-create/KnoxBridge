@@ -72,7 +72,7 @@ std::filesystem::path localInstallerDirectory() {
     if (FAILED(result) || !localAppData) return {};
     std::filesystem::path directory(localAppData);
     CoTaskMemFree(localAppData);
-    return directory / L"KnoxBridgeRuntime" / L"Installer" / L"0.1.0-alpha3";
+    return directory / L"KnoxBridgeRuntime" / L"Installer" / L"0.1.0-alpha4";
 }
 
 int launchSetup() {

@@ -1,6 +1,6 @@
 param(
     [string]$Installer = (Join-Path $PSScriptRoot '..\bootstrap-windows\build\KnoxBridgeSetup.exe'),
-    [string]$PackageZip = (Join-Path $PSScriptRoot '..\build\distributions\KnoxBridgeRuntime-0.1.0-alpha3.zip')
+    [string]$PackageZip = (Join-Path $PSScriptRoot '..\build\distributions\KnoxBridgeRuntime-0.1.0-alpha4.zip')
 )
 $ErrorActionPreference = 'Stop'
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
@@ -18,7 +18,7 @@ try {
     $contents = [IO.Compression.ZipFile]::OpenRead($extracted)
     try {
         $names = @($contents.Entries | ForEach-Object FullName)
-        foreach ($required in @('scripts/user-setup.ps1', 'scripts/trust-decisions.ps1', 'scripts/install.ps1', 'knoxbridge-agent-0.1.0-alpha3.jar', 'bootstrap-windows/knoxbridge-bootstrap.dll')) {
+        foreach ($required in @('scripts/user-setup.ps1', 'scripts/trust-decisions.ps1', 'scripts/install.ps1', 'knoxbridge-agent-0.1.0-alpha4.jar', 'bootstrap-windows/knoxbridge-bootstrap.dll')) {
             if ($names -notcontains $required) { throw "The embedded archive is missing required file: $required" }
         }
     } finally { $contents.Dispose() }

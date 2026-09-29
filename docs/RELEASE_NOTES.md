@@ -16,3 +16,12 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Linux/macOS remain on the ZIP plus Python 3 helper and are not yet live-tested or packaged as native one-file installers.
 - The Windows installer is unsigned; Windows may show an unknown-publisher warning. Verify it came from the official KnoxBridge release before running it.
 - The full normal-Steam/PZ live acceptance and the live Linux/macOS paths have not been rerun for this packaging update.
+
+# KnoxBridge Runtime 0.1.0-alpha4
+
+- Selects Java modules from active Project Zomboid mod roots, so disabled Workshop mods are not loaded just because their files are installed.
+- Adds setup controls to ALLOW or DENY a module's exact JAR SHA-256 from the most recent launch; blank input leaves the decision unchanged.
+- Keeps KnoxBridge independent of Knox Survivors gameplay and ZombieBuddy code. Use only one Java runtime agent at a time; do not stack KnoxBridge with ZombieBuddy.
+- Windows download: `KnoxBridgeSetup.exe` (self-contained setup; uses the game's bundled Java). Linux/macOS download: `KnoxBridgeRuntime-0.1.0-alpha4.zip` (Python 3 helper; close Steam while changing its config).
+- Unknown or changed module hashes remain blocked until the player explicitly allows that exact file. Java modules have the same permissions as the game and are not sandboxed.
+- Offline packaging and verifier checks pass. The alpha4 package has not yet had its own live Build 42 acceptance run. Linux/macOS still require native live testing.

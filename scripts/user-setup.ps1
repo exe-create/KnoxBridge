@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $package = Split-Path -Parent $PSScriptRoot
-$agent = Join-Path $package 'knoxbridge-agent-0.1.0-alpha3.jar'
+$agent = Join-Path $package 'knoxbridge-agent-0.1.0-alpha4.jar'
 $bootstrap = Join-Path $package 'bootstrap-windows\knoxbridge-bootstrap.dll'
 $exampleSource = Join-Path $package 'example-mod\KnoxBridgeIndependentTest'
 $logPath = Join-Path $env:USERPROFILE 'Zomboid\KnoxBridge\knoxbridge.log'

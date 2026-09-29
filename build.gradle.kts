@@ -2,7 +2,7 @@ plugins { base }
 
 allprojects {
     group = "com.knoxbridge"
-    version = "0.1.0-alpha3"
+    version = "0.1.0-alpha4"
     repositories { mavenCentral() }
 }
 
@@ -90,6 +90,7 @@ tasks.register<Zip>("packageRuntime") {
     from("bootstrap-windows/README.md") { into("bootstrap-windows") }
     from("docs") { into("docs") }
     from("THIRD_PARTY_NOTICES.md")
+    from("LICENSE")
     from("README.md")
 }
 
@@ -117,6 +118,7 @@ tasks.register<Zip>("packageManualInstaller") {
     }
     from(files("docs/INSTALLATION.md", "docs/RELEASE_NOTES.md")) { into("docs") }
     from("THIRD_PARTY_NOTICES.md")
+    from("LICENSE")
     from("README.md")
 }
 

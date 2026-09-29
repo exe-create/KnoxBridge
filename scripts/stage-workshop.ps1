@@ -1,7 +1,7 @@
 param(
     [string]$WorkshopDirectory = (Join-Path $env:USERPROFILE 'Zomboid\Workshop\KnoxBridgeRuntime'),
     [string]$ModTemplateDirectory = (Join-Path $env:USERPROFILE 'Zomboid\Workshop\ModTemplate'),
-    [string]$WorkshopItemId = ''
+    [string]$WorkshopItemId = '3810025624'
 )
 $ErrorActionPreference = 'Stop'
 $templatePreview = Join-Path $ModTemplateDirectory 'preview.png'
@@ -24,12 +24,12 @@ New-Item -ItemType Directory -Force -Path $bridge42 | Out-Null
 Copy-Item -LiteralPath $templatePreview -Destination (Join-Path $stage 'preview.png')
 Copy-Item -LiteralPath $templatePoster -Destination $modRoot
 Copy-Item -LiteralPath $templatePoster -Destination $bridge42
-$metadata = "name=KnoxBridge Runtime`nid=KnoxBridgeRuntime`nauthor=.exe`ndescription=Required dependency marker for Java modules using KnoxBridge Runtime. Download the separate setup package from GitHub Releases.`nposter=poster.png`n"
+$metadata = "name=KnoxBridge Runtime`nid=KnoxBridgeRuntime`nauthor=exe-create`ndescription=Required dependency marker for Java modules using KnoxBridge Runtime. Download the separate setup package from GitHub Releases.`nposter=poster.png`n"
 [IO.File]::WriteAllText((Join-Path $modRoot 'mod.info'), $metadata, [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $bridge42 'mod.info'), $metadata, [Text.UTF8Encoding]::new($false))
 $idLine = if ($WorkshopItemId) { "id=$WorkshopItemId`n" } else { '' }
-$description = 'KnoxBridge Runtime is the required dependency marker for Knox Survivors Java features. The Steam Workshop item contains only the PZ mod metadata and default ModTemplate images. Steam blocks installer files here. Download the independent manual setup from https://github.com/exe-create/KnoxBridge/releases/latest. Windows: download and run KnoxBridgeSetup.exe (no separate Java install). Linux/macOS: download the ZIP, close Steam, and run scripts/setup-unix.sh (requires Python 3). Setup menu: 1 install/update, 2 manage module trust by exact hash (ALLOW or DENY), 3 uninstall, 4 exit. Then subscribe to Knox Survivors, enable it in the PZ Mods menu, and start normally through Steam. Java modules run with your account permissions; approve only modules you trust.'
-$workshop = "version=1`n${idLine}title=KnoxBridge Runtime (Required by Knox Survivors)`ndescription=$description`ntags=Build 42`nvisibility=private`n"
+$description = 'KnoxBridge Runtime is a standalone Java-mod runtime and required dependency for Knox Survivors Java features and compatible Build 42 modules. Subscribe to this Workshop item and Knox Survivors, then download the separate setup from https://github.com/exe-create/KnoxBridge/releases/latest. Steam subscription alone does not install the runtime. Windows: run KnoxBridgeSetup.exe and choose Install/Update; it uses Project Zomboid bundled Java. Linux/macOS: extract the ZIP, close Steam, and run sh scripts/setup-unix.sh (Python 3 required). Enable Knox Survivors in the PZ Mods menu and launch normally through Steam. First launch blocks unknown Java module files. Close the game, reopen setup, choose Manage module trust, and ALLOW or DENY each exact SHA-256; changed files need a new decision. Setup can uninstall KnoxBridge. Java modules run with the same permissions as the game and are not sandboxed. Approve only code you trust. Do not configure KnoxBridge and ZombieBuddy on the same Project Zomboid launch; an installed but inactive ZombieBuddy subscription can remain. Linux/macOS setup has not yet had live acceptance.'
+$workshop = "version=1`n${idLine}title=KnoxBridge Runtime (Required by Knox Survivors)`ndescription=$description`ntags=Build 42`nvisibility=public`n"
 [IO.File]::WriteAllText((Join-Path $stage 'workshop.txt'), $workshop, [Text.UTF8Encoding]::new($false))
 $expected = @(
     'mods\KnoxBridgeRuntime\mod.info',

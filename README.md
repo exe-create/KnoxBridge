@@ -8,7 +8,7 @@ Subscribe to the KnoxBridge Runtime Workshop dependency and Knox Survivors. Down
 
 Steam Workshop rejects installer binaries and scripts. Its KnoxBridge item therefore contains only the dependency marker and default ModTemplate images; it cannot install the runtime by itself. One-time local setup is required on every operating system.
 
-The Windows runtime path was observed in normal Steam startup on Project Zomboid 42.21.0, including enabled-mod discovery and test/Knox module loading after explicit hash approval. The alpha3 standalone installer adds Windows packaging; it still needs to be exercised through the full Steam path. Linux/macOS setup needs real installations for live validation and is not yet a single-file installer. Knox module gameplay and save/reload remain under test. Java modules have full account permissions; approve only code you trust. Trust decisions apply to exact hashes, and the setup can persist either ALLOW or DENY for a discovered module.
+The runtime and Knox module path were observed in normal Steam startup on Project Zomboid 42.21.0, including enabled-mod discovery and module loading after exact-hash approval. Alpha4 adds active-mod discovery selection and setup controls to ALLOW or DENY exact JAR hashes. The alpha4 standalone installer still needs its own full Steam-path replay. Linux/macOS setup needs real installations for live validation and is not a single-file installer. Knox module gameplay and save/reload remain under test. Java modules have full account permissions; approve only modules you trust. Trust decisions apply to exact hashes.
 
 ## Build and verify
 
@@ -21,6 +21,6 @@ Requires Java 17 or newer for building. PZ uses its own bundled Java runtime whe
 ./gradlew packageRuntime
 ```
 
-The Unix/player archive is written to `build/distributions/KnoxBridgeRuntime-0.1.0-alpha3.zip`; the Windows self-contained installer is `bootstrap-windows/build/KnoxBridgeSetup.exe`. `packageRuntime` is the developer/test package and includes the independent example fixture. `scripts/verify-windows-installer.ps1` verifies the EXE's embedded archive. `scripts/stage-workshop.ps1` creates the Steam-safe marker-only Workshop upload folder.
+The Unix/player archive is written to `build/distributions/KnoxBridgeRuntime-0.1.0-alpha4.zip`; the Windows self-contained installer is `bootstrap-windows/build/KnoxBridgeSetup.exe`. `packageRuntime` is the developer/test package and includes the independent example fixture. `scripts/verify-windows-installer.ps1` verifies the EXE's embedded archive. `scripts/stage-workshop.ps1` creates the Steam-safe marker-only Workshop upload folder.
 
 Tracked project sources include the generic Java API/runtime, independent test module, Windows native bootstrap source, Windows and Unix setup tools, verification scripts, and documentation. See [Architecture](docs/ARCHITECTURE.md), [Module API](docs/MODULE_API.md), [Patch API](docs/PATCH_API.md), [Trust and security](docs/SECURITY_AND_TRUST.md), [Compatibility](docs/COMPATIBILITY.md), and [Development testing](docs/DEVELOPMENT_TESTING.md).

@@ -33,7 +33,7 @@ Unknown or changed Java module JARs are not loaded until explicitly allowed by e
 
 ## Workshop publishing
 
-Run `scripts/stage-workshop.ps1` on Windows to prepare the KnoxBridge dependency marker under `%USERPROFILE%\Zomboid\Workshop\KnoxBridgeRuntime`. If that stage exists, the script first moves it to `%USERPROFILE%\Zomboid\WorkshopBackups` so the previous installer payload is preserved outside the upload folder. It then emits exactly four files under `Contents/mods/KnoxBridgeRuntime`: `mod.info`, `poster.png`, `42/mod.info`, and `42/poster.png`. It copies the default ModTemplate images without modification and checks the payload against Steam's forbidden extensions. The Workshop item points players to the GitHub release for setup. Keep it private until its release visibility and Knox Survivors' Required Items link are ready.
+Run `scripts/stage-workshop.ps1` on Windows to prepare the KnoxBridge dependency marker under `%USERPROFILE%\Zomboid\Workshop\KnoxBridgeRuntime`. If that stage exists, the script first moves it to `%USERPROFILE%\Zomboid\WorkshopBackups` so the previous payload is preserved outside the upload folder. It then emits exactly four files under `Contents/mods/KnoxBridgeRuntime`: `mod.info`, `poster.png`, `42/mod.info`, and `42/poster.png`. It copies the default ModTemplate images without modification and checks the payload against Steam's forbidden extensions. The public Workshop item points players to the GitHub release for setup; the marker itself does not install KnoxBridge.
 
 ## Acceptance boundaries
 
