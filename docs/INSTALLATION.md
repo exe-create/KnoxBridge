@@ -24,7 +24,7 @@ The release includes a Unix setup helper. It uses Python 3 from the standard lib
 3. Close Steam, open a terminal in the extracted folder, and run `sh scripts/setup-unix.sh`.
 4. Choose **1** to install/update. If setup asks for a `localconfig.vdf` path, select the one under your Steam `userdata/<account>/config/` directory.
 5. Reopen Steam, enable **KnoxBridge Runtime** and Knox Survivors in the PZ Mods menu, and start normally.
-6. At the PZ main menu, review enabled-mod JARs in the full-screen gate before entering a world. Unknown JARs remain blocked unless allowed. Leave **Remember choices** off for one-launch decisions or turn it on to save exact-hash decisions. If a decision changes which modules load, quit and relaunch once to apply it. If the file bridge cannot be used, leave the module blocked and report the problem.
+6. At the PZ main menu, review enabled-mod JARs in the full-screen gate before entering a world. Unknown JARs remain blocked unless allowed. Leave **Remember next choice** unchecked for a one-launch decision or check it to save the next exact-hash choice across launches. If you change a queued decision before continuing, use **Undo pending choice**. If a decision changes which modules load, quit and relaunch once to apply it. If the file bridge cannot be used, leave the module blocked and report the problem.
 
 The helper backs up the exact Steam config before its first edit, records the installed hash, preserves other launch options, and removes only its own option if Steam settings change later. Choose **2** to uninstall. Do not run the helper while Steam is open; Steam can overwrite its local config while running.
 
@@ -32,7 +32,7 @@ Linux/macOS continue to use the `KnoxBridgeRuntime-*.zip` archive and `scripts/s
 
 ## Trust and safety
 
-Unknown or changed Java module JARs are blocked by default. The Bridge Workshop review gate opens at the PZ main menu before a player can enter a world. It shows enabled-mod JAR names, unverified author metadata, and exact SHA-256 hashes. Only a valid KnoxBridge descriptor/API module can be allowed. Unchecked choices apply for one launch; enable **Remember choices** to persist exact-hash decisions. A changed module load set requires one quit/relaunch; unchanged choices do not. If the review UI cannot save a decision, leave that module blocked and report the problem. Java modules run with the same permissions as Project Zomboid and are not sandboxed. Approve only code you trust. The independent test module is a developer fixture and is not installed by the player setup.
+Unknown or changed Java module JARs are blocked by default. The Bridge Workshop review gate opens at the PZ main menu before a player can enter a world. It shows enabled-mod JAR names, unverified author metadata, and exact SHA-256 hashes. Only a valid KnoxBridge descriptor/API module can be allowed. Unchecked choices apply for one launch; **Remember next choice** persists the next exact-hash decision. A queued choice can be removed with **Undo pending choice** before continuing. A changed module load set requires one quit/relaunch; unchanged choices do not. If the review UI cannot save a decision, leave that module blocked and report the problem. Java modules run with the same permissions as Project Zomboid and are not sandboxed. Approve only code you trust. The independent test module is a developer fixture and is not installed by the player setup.
 
 ## Workshop publishing
 
