@@ -4,7 +4,7 @@ KnoxBridge is an independently built Java-mod runtime for Project Zomboid. Knox 
 
 ## Install as a player
 
-Subscribe to the KnoxBridge Runtime Workshop dependency and Knox Survivors. Download the separate [manual installer from GitHub Releases](https://github.com/exe-create/KnoxBridgeRuntime/releases/latest), extract it, and use its numbered setup menu. Windows uses `KnoxBridge Setup.cmd`; Linux and macOS use `sh scripts/setup-unix.sh` from a terminal with Steam closed. Setup options are **1** install/update, **2** approve a module's exact SHA-256, **3** uninstall, and **4** exit. Then enable Knox Survivors in the PZ Mods menu and start normally through Steam. See [installation details](docs/INSTALLATION.md).
+Subscribe to the KnoxBridge Runtime Workshop dependency and Knox Survivors. Download the separate [manual installer from GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest), extract it, and use its numbered setup menu. Windows uses `KnoxBridge Setup.cmd`; Linux and macOS use `sh scripts/setup-unix.sh` from a terminal with Steam closed. Setup options are **1** install/update, **2** approve a module's exact SHA-256, **3** uninstall, and **4** exit. Then enable Knox Survivors in the PZ Mods menu and start normally through Steam. See [installation details](docs/INSTALLATION.md).
 
 Steam Workshop rejects installer binaries and scripts. Its KnoxBridge item therefore contains only the dependency marker and default ModTemplate images; it cannot install the runtime by itself. One-time local setup is required on every operating system.
 
