@@ -1,6 +1,6 @@
 # Player setup
 
-KnoxBridge has a small Steam Workshop dependency marker and a separate manual setup download. Steam rejects executable and installer file types in Workshop uploads, so the Workshop item contains only the PZ metadata and default ModTemplate images. The player installer is distributed from [KnoxBridge GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest).
+KnoxBridge has a Steam Workshop dependency marker and a separate player setup download. The Workshop item carries PZ metadata, the compile-time API JAR, and concise player/mod-author guides; it does not install or activate the runtime. Download player setup from [KnoxBridge GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest). The separate Knox Survivors Launcher is deprecated and unsupported. Do not download or use its old releases, or combine it or a direct legacy Knox agent with KnoxBridge.
 
 ## Windows
 
@@ -34,7 +34,7 @@ Unknown or changed Java module JARs are not loaded until explicitly allowed by e
 
 ## Workshop publishing
 
-Run `scripts/stage-workshop.ps1` on Windows to prepare the KnoxBridge dependency marker under `%USERPROFILE%\Zomboid\Workshop\KnoxBridgeRuntime`. If that stage exists, the script first moves it to `%USERPROFILE%\Zomboid\WorkshopBackups` so the previous payload is preserved outside the upload folder. It then emits exactly four files under `Contents/mods/KnoxBridgeRuntime`: `mod.info`, `poster.png`, `42/mod.info`, and `42/poster.png`. It copies the default ModTemplate images without modification and checks the payload against Steam's forbidden extensions. The public Workshop item points players to the GitHub release for setup; the marker itself does not install KnoxBridge.
+Run `scripts/stage-workshop.ps1` on Windows to prepare the KnoxBridge Workshop item under `%USERPROFILE%\Zomboid\Workshop\KnoxBridgeRuntime`. If that stage exists, the script first moves it to `%USERPROFILE%\Zomboid\WorkshopBackups` so the previous payload is preserved outside the upload folder. The upload contains PZ dependency metadata and default ModTemplate images, a short in-mod README, the compile-time `runtime-api` JAR, its license, and the existing module-author, patch, compatibility, and installation guides. It does not contain the player runtime installer: download that from GitHub Releases and follow `developer/docs/INSTALLATION.md` (also linked from the Workshop description). The API JAR is for compiling compatible modules; it does not install or activate KnoxBridge. Developer test modules and installer executables are excluded. The staging script checks the exact expected payload and rejects installer/system-launch file types before upload.
 
 ## Acceptance boundaries
 
