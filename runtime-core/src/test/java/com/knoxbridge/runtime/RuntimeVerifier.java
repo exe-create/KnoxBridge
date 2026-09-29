@@ -11,6 +11,7 @@ public final class RuntimeVerifier {
         Path mod = Files.createDirectories(temp.resolve("enabled-mod"));
         Path moduleJar = Path.of(System.getProperty("knoxbridge.testModuleJar"));
         Files.copy(moduleJar, mod.resolve("knoxbridge-example-module.jar"));
+        Files.writeString(mod.resolve("mod.info"), "name=Example Java Mod\nauthor=Example Author\n");
         Files.writeString(mod.resolve("knoxbridge.properties"), "id=org.example.knoxbridge.greeting\nversion=1.0.0\napiVersion=1\nentrypoint=org.example.knoxbridge.ExampleModule\njar=knoxbridge-example-module.jar\n");
         Path disabled = Files.createDirectories(temp.resolve("disabled-mod"));
         Files.copy(mod.resolve("knoxbridge.properties"), disabled.resolve("knoxbridge.properties"));
@@ -19,15 +20,39 @@ public final class RuntimeVerifier {
         Files.copy(mod.resolve("knoxbridge-example-module.jar"), duplicate.resolve("knoxbridge-example-module.jar"));
 
         List<ModuleDiscovery.Candidate> candidates = ModuleDiscovery.inspectEnabledRoots(List.of(mod), s -> { });
+        String hash = Hashing.sha256(candidates.get(0).descriptor().jar());
         check(candidates.size() == 1 && candidates.get(0).problem() == null, "enabled-root discovery");
         check(ModuleDiscovery.inspectEnabledRoots(List.of(disabled), s -> { }).get(0).descriptor() == null,
             "missing module jar is rejected");
+        check(ModuleApprovalDialog.claimedModInfo(mod).contains("PZ mod name: Example Java Mod"),
+            "approval details include declared mod name");
+        check(ModuleApprovalDialog.claimedModInfo(mod).contains("Declared author (not verified): Example Author"),
+            "approval details label mod author as unverified");
+        check(ModuleApprovalDialog.claimedModInfo(disabled).contains("Declared author (not verified): Not provided"),
+            "approval details handle absent author metadata");
+        check(ModuleApprovalDialog.decisionForSelection(0) == TrustStore.Decision.ALLOW_EXACT,
+            "allow choice persists exact-hash approval");
+        check(ModuleApprovalDialog.decisionForSelection(1) == TrustStore.Decision.DENY_EXACT,
+            "deny choice persists exact-hash denial");
+        check(ModuleApprovalDialog.decisionForSelection(2) == TrustStore.Decision.APPROVAL_REQUIRED,
+            "skip choice leaves module blocked");
+        TrustStore uiTrust = new TrustStore(temp.resolve("ui-trust.properties"));
+        ModuleApprovalDialog.persistDecision(uiTrust, hash, ModuleApprovalDialog.decisionForSelection(0));
+        check(uiTrust.check(hash) == TrustStore.Decision.ALLOW_EXACT,
+            "startup allow choice persists before module loading");
+        check(uiTrust.check("1".repeat(64)) == TrustStore.Decision.APPROVAL_REQUIRED,
+            "startup approval does not trust a changed jar hash");
+        ModuleApprovalDialog.persistDecision(uiTrust, "2".repeat(64), ModuleApprovalDialog.decisionForSelection(1));
+        check(uiTrust.check("2".repeat(64)) == TrustStore.Decision.DENY_EXACT,
+            "startup deny choice persists for the exact jar hash");
+        ModuleApprovalDialog.persistDecision(uiTrust, "3".repeat(64), ModuleApprovalDialog.decisionForSelection(2));
+        check(uiTrust.check("3".repeat(64)) == TrustStore.Decision.APPROVAL_REQUIRED,
+            "startup skip choice persists no trust decision");
         check(ModuleDiscovery.inspectEnabledRoots(List.of(mod, duplicate), s -> { }).stream().allMatch(c -> c.problem() != null),
             "duplicate module IDs both rejected");
         check(Hashing.sha256(candidates.get(0).descriptor().jar()).length() == 64, "SHA-256 identity");
 
         TrustStore trust = new TrustStore(temp.resolve("trust.properties"));
-        String hash = Hashing.sha256(candidates.get(0).descriptor().jar());
         check(trust.check(hash) == TrustStore.Decision.APPROVAL_REQUIRED, "unknown jar requires approval");
         trust.decide(hash, TrustStore.Decision.ALLOW_ONCE);
         check(trust.check(hash) == TrustStore.Decision.ALLOW_ONCE, "allow once");
@@ -114,7 +139,7 @@ public final class RuntimeVerifier {
         check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-agentlib:zbNative")), "native ZombieBuddy runtime conflict detected");
         check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-javaagent:ZombieBuddy.jar")), "other Java agent conflict detected");
         check(!KnoxBridgeAgent.hasCompetingBootstrap(List.of("-javaagent:C:/game/.knoxbridge/knoxbridge-agent.jar")), "KnoxBridge agent not treated as foreign");
-        System.out.println("KnoxBridge offline verification PASS checks=29");
+        System.out.println("KnoxBridge offline verification PASS checks=39");
     }
 
     private static void check(boolean ok, String name) { if (!ok) throw new AssertionError(name); }

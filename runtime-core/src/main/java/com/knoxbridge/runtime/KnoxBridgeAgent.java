@@ -14,7 +14,7 @@ import java.lang.management.ManagementFactory;
 /** Early JVM bootstrap and PZ-specific adapter owner. */
 public final class KnoxBridgeAgent {
     private static final String VERSION = KnoxBridgeAgent.class.getPackage().getImplementationVersion() == null
-        ? "0.1.0-alpha5" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
+        ? "0.1.0-alpha6" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
     private static final AtomicBoolean STARTED = new AtomicBoolean();
     private static final AtomicBoolean MODULES_STARTED = new AtomicBoolean();
     private static final List<ModuleLoader.LoadedModule> LOADED = new CopyOnWriteArrayList<>();
@@ -118,8 +118,12 @@ public final class KnoxBridgeAgent {
                 trust.observe(hash, d.id(), candidate.modRoot());
                 log.write("module discovered id=" + d.id() + " source=" + candidate.modRoot() + " hash=" + hash);
                 TrustStore.Decision decision = trust.check(hash);
+                if (decision == TrustStore.Decision.APPROVAL_REQUIRED) {
+                    decision = ModuleApprovalDialog.prompt(d, candidate.modRoot(), hash, log::write);
+                    ModuleApprovalDialog.persistDecision(trust, hash, decision);
+                }
                 if (decision != TrustStore.Decision.ALLOW_ONCE && decision != TrustStore.Decision.ALLOW_EXACT) {
-                    log.write("module approval required id=" + d.id() + " decision=" + decision);
+                    log.write("module blocked id=" + d.id() + " decision=" + decision);
                     continue;
                 }
                 LOADED.add(ModuleLoader.load(d, d.jar(), VERSION, patchEngine, instrumentation, log::write));

@@ -16,7 +16,7 @@ The agent instruments exactly `ZomboidFileSystem.loadMods(List)` and reads `getM
 
 A module declares ID, version, API version, entrypoint, and an in-root JAR path. The default `isolated` policy uses a separate `URLClassLoader`. `classLoader=system` appends the module JAR to the system loader; Knox uses this because its transformed PZ classes must resolve helper methods. `ModuleContext.instrumentation()` gives the trusted module the instrumentation handle. Modules have normal JVM permissions and are not sandboxed.
 
-JAR SHA-256 is the trust identity. Unknown or changed hashes stay blocked until an explicit decision. Duplicate module IDs, unsupported API versions, invalid paths, and malformed descriptors are reported and skipped. A module initialization failure is attributed to that module and does not by itself abort PZ startup.
+JAR SHA-256 is the trust identity. Unknown or changed hashes trigger a startup approval dialog before the module JAR is loaded. Allow/deny decisions persist only for that exact hash; Skip, window close, headless execution, or UI errors leave the module blocked. The dialog can show the PZ mod's declared name and author, clearly labeled unverified metadata. Duplicate module IDs, unsupported API versions, invalid paths, and malformed descriptors are reported and skipped. A module initialization failure is attributed to that module and does not by itself abort PZ startup.
 
 ## Patches
 

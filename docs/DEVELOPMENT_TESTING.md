@@ -26,4 +26,4 @@ To inspect a local game JAR without modifying it, run `gradlew :runtime-core:ver
 - [x] Uninstall restores the exact original JSON; normal Steam starts with no new runtime log, then reinstall and another Steam start load both approved modules.
 - [ ] Linux/macOS setup, Steam restart, direct Java agent, and uninstall have offline tests only; no live platform acceptance yet.
 
-Live bootstrap, discovery, unknown-hash blocking, exact-hash approval/load, module lifecycle, Knox patch readiness, bridge exposure, and uninstall/restore are checked. Deny/changed-hash behavior and in-world gameplay/save acceptance remain open.
+Live bootstrap, discovery, unknown-hash blocking, exact-hash approval/load, module lifecycle, Knox patch readiness, bridge exposure, and uninstall/restore are checked on the prior runtime build. The alpha6 startup approval dialog is covered offline for metadata display, exact-hash persistence, and decision mapping, but still needs a live PZ startup test for focus, visibility, allow/deny persistence, and continuation into the game. Deny/changed-hash behavior and in-world gameplay/save acceptance remain open.

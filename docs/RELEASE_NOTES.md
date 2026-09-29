@@ -34,3 +34,11 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Adds disposable native-installer fixture coverage for idempotent install, exact backup restoration, user-edit preservation, and blocking a competing runtime.
 - Targeted Microsoft Defender scan of the built release artifact found no threats on the maintainer's machine. The installer remains unsigned; this scan is not a guarantee for other antivirus products or a Microsoft cloud-reputation verdict. Stop and report any malware detection; never bypass it.
 - Alpha5 installer behavior has offline fixture coverage. The new installer still needs a fresh normal-Steam/PZ acceptance run; no full live acceptance is claimed.
+
+# KnoxBridge Runtime 0.1.0-alpha6
+
+- Unknown Java modules now trigger a modal startup approval dialog before their JAR is loaded.
+- The dialog shows the KnoxBridge module ID, exact JAR SHA-256, PZ mod name, and any declared author. Author text is explicitly unverified metadata, not authenticated identity.
+- Allow and deny decisions are saved only for the displayed exact JAR hash. Skip, closing the window, headless execution, or UI errors leave the module blocked.
+- Installer option 2 and the Unix helper trust menu remain available as fallback when the graphical dialog cannot be shown.
+- Offline decision and metadata checks pass. Visibility/focus during real PZ startup and full Build 42 acceptance remain live-unverified.

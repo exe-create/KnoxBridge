@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $package = Split-Path -Parent $PSScriptRoot
-$agent = Join-Path $package 'knoxbridge-agent-0.1.0-alpha5.jar'
+$agent = Join-Path $package 'knoxbridge-agent-0.1.0-alpha6.jar'
 $bootstrap = Join-Path $package 'bootstrap-windows\knoxbridge-bootstrap.dll'
 $exampleSource = Join-Path $package 'example-mod\KnoxBridgeIndependentTest'
 $logPath = Join-Path $env:USERPROFILE 'Zomboid\KnoxBridge\knoxbridge.log'
@@ -51,7 +51,7 @@ function Install-KnoxBridge {
     Write-Host ''
     Write-Host 'KnoxBridge is installed. No Steam Launch Options are needed; start Project Zomboid normally with Steam Play.'
     Write-Host 'For Knox Survivors, enable Knox Survivors in the PZ Mods menu; KnoxBridge Runtime is its required Workshop dependency.'
-    Write-Host 'The first launch records an unknown module hash and blocks it. Close the game, return here, choose “Manage module trust”, then ALLOW or DENY the exact hash (or skip) and relaunch.'
+    Write-Host 'On first game startup, KnoxBridge prompts before loading each unknown module. If the prompt cannot appear, close the game, return here, choose “Manage module trust”, then ALLOW or DENY the exact hash (or skip) and relaunch.'
     if (Test-Path -LiteralPath $exampleSource) { Write-Host 'For independent runtime testing, enable the optional KnoxBridge Independent Test Module in the PZ Mods menu.' }
 }
 
