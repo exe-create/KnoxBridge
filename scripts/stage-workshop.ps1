@@ -4,10 +4,9 @@ param(
     [string]$WorkshopItemId = '3810025624'
 )
 $ErrorActionPreference = 'Stop'
-$templatePreview = Join-Path $ModTemplateDirectory 'preview.png'
-$templatePoster = Join-Path $ModTemplateDirectory 'Contents\mods\ModTemplate\poster.png'
-if (!(Test-Path -LiteralPath $templatePreview) -or !(Test-Path -LiteralPath $templatePoster)) {
-    throw "Default ModTemplate preview/poster images not found under $ModTemplateDirectory"
+$bridgeArtwork = Join-Path $PSScriptRoot '..\workshop\preview.png'
+if (!(Test-Path -LiteralPath $bridgeArtwork)) {
+    throw "KnoxBridge Workshop artwork not found: $bridgeArtwork"
 }
 $stage = [IO.Path]::GetFullPath($WorkshopDirectory)
 if (Test-Path -LiteralPath $stage) {
@@ -25,9 +24,9 @@ $developerDocs = Join-Path $developerRoot 'docs'
 $developerLib = Join-Path $developerRoot 'lib'
 New-Item -ItemType Directory -Force -Path $bridge42 | Out-Null
 New-Item -ItemType Directory -Force -Path $developerDocs, $developerLib | Out-Null
-Copy-Item -LiteralPath $templatePreview -Destination (Join-Path $stage 'preview.png')
-Copy-Item -LiteralPath $templatePoster -Destination $modRoot
-Copy-Item -LiteralPath $templatePoster -Destination $bridge42
+Copy-Item -LiteralPath $bridgeArtwork -Destination (Join-Path $stage 'preview.png')
+Copy-Item -LiteralPath $bridgeArtwork -Destination (Join-Path $modRoot 'poster.png')
+Copy-Item -LiteralPath $bridgeArtwork -Destination (Join-Path $bridge42 'poster.png')
 $bridgeMedia = Join-Path $PSScriptRoot '..\workshop\mod\42\media'
 if (!(Test-Path -LiteralPath $bridgeMedia)) { throw "KnoxBridge Workshop Lua/UI sources not found: $bridgeMedia" }
 Copy-Item -LiteralPath $bridgeMedia -Destination $bridge42 -Recurse
@@ -46,6 +45,20 @@ if (!(Test-Path -LiteralPath $apiJar)) {
 if (!(Test-Path -LiteralPath $apiJar)) { throw "Runtime API JAR not found: $apiJar" }
 Copy-Item -LiteralPath $apiJar -Destination $developerLib
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\LICENSE') -Destination $developerRoot
+$exampleSource = Join-Path $PSScriptRoot '..\examples\minimal-module'
+$exampleDestination = Join-Path $developerRoot 'example'
+$exampleSourceFiles = @(
+    'build.gradle.kts',
+    'settings.gradle.kts',
+    'knoxbridge.properties',
+    'mod.info',
+    'src\main\java\org\example\mymod\MyModule.java'
+)
+foreach ($relativePath in $exampleSourceFiles) {
+    $destinationFile = Join-Path $exampleDestination $relativePath
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationFile) | Out-Null
+    Copy-Item -LiteralPath (Join-Path $exampleSource $relativePath) -Destination $destinationFile
+}
 foreach ($guide in @('MODULE_API.md', 'PATCH_API.md', 'COMPATIBILITY.md', 'INSTALLATION.md')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "..\docs\$guide") -Destination $developerDocs
 }
@@ -65,7 +78,8 @@ BRIDGE MODULE REVIEW
 
 MOD AUTHOR QUICK START
 - Compile against developer/lib/runtime-api-$version.jar.
-- Implement com.knoxbridge.api.KnoxModule and provide a knoxbridge.properties descriptor.
+- Copy developer/example to a workspace with Java 17 and Gradle 8.14.3+, then run: gradle -p developer/example build "-PknoxbridgeApiJar=<path to developer/lib/runtime-api-$version.jar>".
+- Copy the example mod.info and knoxbridge.properties into your PZ mod's 42 directory; copy build/libs/minimal-module.jar to 42/media/java/.
 - Read developer/docs/MODULE_API.md before packaging.
 - Use developer/docs/PATCH_API.md for patch contracts and developer/docs/COMPATIBILITY.md for verified boundaries.
 - KnoxBridge does not make arbitrary Java mods compatible automatically; the mod author must integrate with its API and test against the target Project Zomboid build.
@@ -92,7 +106,12 @@ $expected = @(
     'mods\KnoxBridgeRuntime\developer\docs\MODULE_API.md',
     'mods\KnoxBridgeRuntime\developer\docs\PATCH_API.md',
     'mods\KnoxBridgeRuntime\developer\docs\COMPATIBILITY.md',
-    'mods\KnoxBridgeRuntime\developer\docs\INSTALLATION.md'
+    'mods\KnoxBridgeRuntime\developer\docs\INSTALLATION.md',
+    'mods\KnoxBridgeRuntime\developer\example\build.gradle.kts',
+    'mods\KnoxBridgeRuntime\developer\example\settings.gradle.kts',
+    'mods\KnoxBridgeRuntime\developer\example\knoxbridge.properties',
+    'mods\KnoxBridgeRuntime\developer\example\mod.info',
+    'mods\KnoxBridgeRuntime\developer\example\src\main\java\org\example\mymod\MyModule.java'
 )
 $actual = @(Get-ChildItem -LiteralPath $content -Recurse -File | ForEach-Object { $_.FullName.Substring($content.Length).TrimStart([char[]]@('\','/')).Replace('/', '\') })
 if ((($actual | Sort-Object) -join "`n") -ne (($expected | Sort-Object) -join "`n")) {

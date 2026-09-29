@@ -82,6 +82,10 @@ tasks.register<Zip>("packageRuntime") {
     from(project(":runtime-api").layout.buildDirectory.dir("libs")) { include("runtime-api-${project.version}.jar*") }
     from(project(":test-module").layout.buildDirectory.dir("libs")) { include("knoxbridge-example-module-${project.version}.jar*") }
     from(layout.buildDirectory.dir("staged-example")) { into("example-mod") }
+    from("examples/minimal-module") {
+        include("build.gradle.kts", "settings.gradle.kts", "knoxbridge.properties", "mod.info", "src/main/java/**/*.java")
+        into("examples/minimal-module")
+    }
     from("scripts") { into("scripts") }
     from("KnoxBridge Setup.cmd")
     from(layout.projectDirectory.file("bootstrap-windows/build/knoxbridge-bootstrap.dll")) { into("bootstrap-windows") }
