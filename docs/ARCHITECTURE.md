@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`runtime-api` is the small contract that Java modules build against. `runtime-core` owns metadata checks, JAR hashing, exact-hash trust, class loading, lifecycle, patch registration, and diagnostics. `test-module` is an independent example PZ mod. Windows setup scripts own only KnoxBridge's startup arguments and backup/state files.
+`runtime-api` is the small contract that Java modules build against. `runtime-core` owns metadata checks, JAR hashing, exact-hash trust, class loading, lifecycle, patch registration, and diagnostics. `test-module` is an independent example PZ mod. The self-contained Windows installer owns only KnoxBridge's startup arguments and backup/state files; the Unix setup script owns its single Steam launch-option entry.
 
 KnoxBridge owns no Knox gameplay, survivor persistence, Lua bridge, or NPC state. Knox Survivors is a normal client module that supplies its Java bridge and PZ-specific patches. One instrumentation runtime per PZ process is the policy.
 

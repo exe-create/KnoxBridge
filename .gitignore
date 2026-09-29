@@ -1,6 +1,8 @@
 # Gradle output and local caches
 .gradle/
 **/build/
+**/bin/
+**/obj/
 
 # IDE files
 *.iml

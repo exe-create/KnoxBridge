@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>KnoxBridgeSetup</AssemblyName>
+    <RootNamespace>KnoxBridge.Setup</RootNamespace>
+    <AssemblyCompany>KnoxBridge</AssemblyCompany>
+    <Product>KnoxBridge Runtime Setup</Product>
+    <Description>Installs KnoxBridge Runtime for Project Zomboid.</Description>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(PayloadPath)" LogicalName="KnoxBridge.SetupPayload.zip" />
+  </ItemGroup>
+</Project>

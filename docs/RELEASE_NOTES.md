@@ -25,3 +25,12 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Windows download: `KnoxBridgeSetup.exe` (self-contained setup; uses the game's bundled Java). Linux/macOS download: `KnoxBridgeRuntime-0.1.0-alpha4.zip` (Python 3 helper; close Steam while changing its config).
 - Unknown or changed module hashes remain blocked until the player explicitly allows that exact file. Java modules have the same permissions as the game and are not sandboxed.
 - Offline packaging and verifier checks pass. The alpha4 package has not yet had its own live Build 42 acceptance run. Linux/macOS still require native live testing.
+- Security notice (2026-09-29): Microsoft Defender reported a severe Trojan detection on `KnoxBridgeSetup.exe`. The Windows asset was withdrawn pending review; do not restore or run it. Existing installations are unaffected. Windows setup is unavailable until a reviewed replacement is published.
+
+# KnoxBridge Runtime 0.1.0-alpha5
+
+- Replaces the Windows self-extractor/PowerShell launcher with a self-contained Knox-owned .NET installer that performs checksum-verified package reading, install, conflict checks, trust approval, and uninstall directly.
+- The installer does not launch PowerShell or another command shell. The player ZIP no longer includes Windows setup scripts; it contains the Unix helper and shared runtime files only.
+- Adds disposable native-installer fixture coverage for idempotent install, exact backup restoration, user-edit preservation, and blocking a competing runtime.
+- Targeted Microsoft Defender scan of the built release artifact found no threats on the maintainer's machine. The installer remains unsigned; this scan is not a guarantee for other antivirus products or a Microsoft cloud-reputation verdict. Stop and report any malware detection; never bypass it.
+- Alpha5 installer behavior has offline fixture coverage. The new installer still needs a fresh normal-Steam/PZ acceptance run; no full live acceptance is claimed.

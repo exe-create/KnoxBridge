@@ -2,7 +2,7 @@ plugins { base }
 
 allprojects {
     group = "com.knoxbridge"
-    version = "0.1.0-alpha4"
+    version = "0.1.0-alpha5"
     repositories { mavenCentral() }
 }
 
@@ -102,7 +102,6 @@ tasks.register<Zip>("packageManualInstaller") {
     archiveBaseName.set("KnoxBridgeRuntime")
     archiveVersion.set(project.version.toString())
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
-    from("KnoxBridge Setup.cmd")
     from(project(":runtime-core").layout.buildDirectory.dir("libs")) {
         include("knoxbridge-agent-${project.version}.jar", "knoxbridge-agent-${project.version}.jar.sha256")
     }
@@ -113,7 +112,7 @@ tasks.register<Zip>("packageManualInstaller") {
         into("bootstrap-windows")
     }
     from("scripts") {
-        include("user-setup.ps1", "trust-decisions.ps1", "install.ps1", "uninstall.ps1", "verify-installation.ps1", "setup-unix.sh", "setup-unix.py")
+        include("setup-unix.sh", "setup-unix.py")
         into("scripts")
     }
     from(files("docs/INSTALLATION.md", "docs/RELEASE_NOTES.md")) { into("docs") }
@@ -124,10 +123,11 @@ tasks.register<Zip>("packageManualInstaller") {
 
 tasks.register<Exec>("buildWindowsInstaller") {
     group = "distribution"
-    description = "Builds the self-contained Windows setup executable with the player package embedded."
+    description = "Builds the self-contained .NET KnoxBridge Windows setup application with the player package embedded."
     dependsOn("packageManualInstaller")
-    inputs.file(layout.projectDirectory.file("bootstrap-windows/src/knoxbridge_setup.cpp"))
-    inputs.file(layout.projectDirectory.file("scripts/build-windows-installer.ps1"))
+    inputs.file(layout.projectDirectory.file("windows-installer/Program.cs"))
+    inputs.file(layout.projectDirectory.file("windows-installer/KnoxBridge.Installer.csproj"))
+    inputs.file(layout.buildDirectory.file("distributions/KnoxBridgeRuntime-${project.version}.zip"))
     outputs.file(layout.projectDirectory.file("bootstrap-windows/build/KnoxBridgeSetup.exe"))
     doFirst {
         if (!System.getProperty("os.name").lowercase().contains("windows")) {
@@ -135,8 +135,11 @@ tasks.register<Exec>("buildWindowsInstaller") {
         }
     }
     commandLine(
-        "powershell", "-ExecutionPolicy", "Bypass", "-File",
-        file("scripts/build-windows-installer.ps1").absolutePath,
-        "-PackageZip", layout.buildDirectory.file("distributions/KnoxBridgeRuntime-${project.version}.zip").get().asFile.absolutePath
+        "dotnet", "publish", file("windows-installer/KnoxBridge.Installer.csproj").absolutePath,
+        "--configuration", "Release", "--runtime", "win-x64", "--self-contained", "true",
+        "-p:PublishSingleFile=true", "-p:IncludeNativeLibrariesForSelfExtract=true",
+        "-p:DebugType=None", "-p:DebugSymbols=false",
+        "-p:PayloadPath=${layout.buildDirectory.file("distributions/KnoxBridgeRuntime-${project.version}.zip").get().asFile.absolutePath}",
+        "--output", layout.projectDirectory.dir("bootstrap-windows/build").asFile.absolutePath
     )
 }
