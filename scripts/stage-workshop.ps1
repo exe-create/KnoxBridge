@@ -28,6 +28,9 @@ New-Item -ItemType Directory -Force -Path $developerDocs, $developerLib | Out-Nu
 Copy-Item -LiteralPath $templatePreview -Destination (Join-Path $stage 'preview.png')
 Copy-Item -LiteralPath $templatePoster -Destination $modRoot
 Copy-Item -LiteralPath $templatePoster -Destination $bridge42
+$bridgeMedia = Join-Path $PSScriptRoot '..\workshop\mod\42\media'
+if (!(Test-Path -LiteralPath $bridgeMedia)) { throw "KnoxBridge Workshop Lua/UI sources not found: $bridgeMedia" }
+Copy-Item -LiteralPath $bridgeMedia -Destination $bridge42 -Recurse
 $metadata = "name=KnoxBridge Runtime`nid=KnoxBridgeRuntime`nauthor=exe-create`ndescription=Required PZ dependency marker with KnoxBridge API and mod-author guides. Download the separate player setup from GitHub Releases.`nposter=poster.png`n"
 [IO.File]::WriteAllText((Join-Path $modRoot 'mod.info'), $metadata, [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $bridge42 'mod.info'), $metadata, [Text.UTF8Encoding]::new($false))
@@ -54,6 +57,12 @@ This Workshop item is a Project Zomboid dependency marker and author reference. 
 https://github.com/exe-create/KnoxBridge/releases/latest
 Follow developer/docs/INSTALLATION.md. The Windows installer and Linux/macOS setup archive are distributed on GitHub Releases.
 
+BRIDGE MODULE REVIEW
+- Enable KnoxBridge Runtime in the PZ Mods menu. Its main-menu Review Java Mods screen lists JARs found in enabled mods.
+- Unknown hashes are blocked by default. Allow/deny choices are stored for the exact SHA-256 and applied on the next full launch.
+- JARs without a valid KnoxBridge descriptor are listed but cannot be loaded until their author adds Bridge compatibility.
+- If the UI cannot save a decision, leave the module blocked and report the problem.
+
 MOD AUTHOR QUICK START
 - Compile against developer/lib/runtime-api-$version.jar.
 - Implement com.knoxbridge.api.KnoxModule and provide a knoxbridge.properties descriptor.
@@ -62,11 +71,11 @@ MOD AUTHOR QUICK START
 - KnoxBridge does not make arbitrary Java mods compatible automatically; the mod author must integrate with its API and test against the target Project Zomboid build.
 
 TRUST AND SAFETY
-Java modules run with the game's account permissions and are not sandboxed. Approve only modules you trust. The author text in mod.info is a claim, not authenticated identity. KnoxBridge is an independent project and does not include ZombieBuddy code.
+Java modules run with the game's account permissions and are not sandboxed. Approve only modules you trust. The author text in mod.info is a claim, not authenticated identity. KnoxBridge's runtime and API are maintained as independent project components.
 "@
 [IO.File]::WriteAllText((Join-Path $modRoot 'README.txt'), $quickStart, [Text.UTF8Encoding]::new($false))
 $idLine = if ($WorkshopItemId) { "id=$WorkshopItemId`n" } else { '' }
-$description = 'KnoxBridge Runtime is the required PZ dependency marker for Knox Survivors Java features. The Workshop files also include the KnoxBridge compile-time API and mod-author guides. They do not install the runtime. For player setup, download the official package from https://github.com/exe-create/KnoxBridge/releases/latest and follow the included Installation guide. Windows: run KnoxBridgeSetup.exe, choose Install/Update, enable Knox Survivors, then start normally through Steam. Linux/macOS: extract the ZIP, close Steam, and run sh scripts/setup-unix.sh (Python 3 required; these platforms are not live-verified). The installer is unsigned; an unknown-publisher notice may appear. If Windows Security reports malware, stop and do not run or whitelist the file; report the detection name and release SHA-256. KnoxBridge and ZombieBuddy are alternatives; do not configure both on one PZ launch. Java modules run with the same permissions as the game and are not sandboxed. Approve only code you trust.'
+$description = 'KnoxBridge Runtime is the required PZ dependency marker for Knox Survivors Java features. The Workshop item includes the Bridge-owned in-game Java mod review UI, API, and mod-author guides; it does not install the Java runtime. Download player setup from https://github.com/exe-create/KnoxBridge/releases/latest. Enable KnoxBridge Runtime and Knox Survivors in the PZ Mods menu. At the main menu, Review Java Mods lists JAR files found in enabled mods. Unknown files remain blocked by default. Allow/deny decisions apply to the exact SHA-256 and are saved for the next launch; normal approval does not require the installer. Only modules with a valid KnoxBridge descriptor/API can be allowed; authors must add compatibility. Displayed author metadata is unverified. Windows: run KnoxBridgeSetup.exe. Linux/macOS: extract the ZIP, close Steam, and run sh scripts/setup-unix.sh (Python 3 required; these platforms are not live-verified). If Windows Security reports malware, stop and do not run or whitelist the installer. Configure only one Java instrumentation runtime for Project Zomboid at a time. Java modules have the same permissions as the game and are not sandboxed; approve only code you trust.'
 $workshop = "version=1`n${idLine}title=KnoxBridge Runtime (Required by Knox Survivors)`ndescription=$description`ntags=Build 42`nvisibility=public`n"
 [IO.File]::WriteAllText((Join-Path $stage 'workshop.txt'), $workshop, [Text.UTF8Encoding]::new($false))
 $expected = @(
@@ -74,6 +83,9 @@ $expected = @(
     'mods\KnoxBridgeRuntime\poster.png',
     'mods\KnoxBridgeRuntime\42\mod.info',
     'mods\KnoxBridgeRuntime\42\poster.png',
+    'mods\KnoxBridgeRuntime\42\media\lua\client\KnoxBridgeModuleReview.lua',
+    'mods\KnoxBridgeRuntime\42\media\lua\client\KnoxBridgeSupportButton.lua',
+    'mods\KnoxBridgeRuntime\42\media\ui\knoxKofi.png',
     'mods\KnoxBridgeRuntime\README.txt',
     "mods\KnoxBridgeRuntime\developer\lib\runtime-api-$version.jar",
     'mods\KnoxBridgeRuntime\developer\LICENSE',

@@ -8,13 +8,11 @@ import shutil
 import sys
 
 APP_ID = "108600"
-VERSION = "0.1.0-alpha6"
+VERSION = "0.1.0-alpha7"
 BASE = Path.home() / ".knoxbridge"
 STATE = BASE / "install-state.json"
 BACKUP = BASE / "steam-localconfig.vdf.original"
 AGENT = BASE / "knoxbridge-agent.jar"
-TRUST = Path.home() / "Zomboid" / "KnoxBridge" / "trust.properties"
-LOG = Path.home() / "Zomboid" / "KnoxBridge" / "knoxbridge.log"
 TOKEN_RE = re.compile(r'"(?:\\.|[^"\\])*"|[{}]|//[^\r\n]*')
 
 
@@ -174,7 +172,7 @@ def install():
     prior_state = json.loads(STATE.read_text(encoding="utf-8")) if STATE.is_file() else None
     owned_argument = prior_state.get("argument", "") if prior_state else ""
     competing = launch_text.replace(owned_argument, "") if owned_argument else launch_text
-    if re.search(r"(?i)(-javaagent:|-agentpath:|-agentlib:zbNative|ZombieBuddy)", competing):
+    if re.search(r"(?i)(-javaagent:|-agentpath:|-agentlib:)", competing):
         raise RuntimeError("A Java instrumentation runtime already appears in this Steam config. Remove/disable it first; KnoxBridge will not stack agents.")
     BASE.mkdir(parents=True, exist_ok=True)
     if prior_state:
@@ -195,51 +193,6 @@ def install():
     STATE.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
     print(f"Installed KnoxBridge for {sys.platform}; agent SHA-256: {state['agentSha256']}")
     print("Close and reopen Steam, then start Project Zomboid normally. No other Java agent may be enabled.")
-
-
-def save_trust_decision(digest, decision):
-    digest = digest.lower()
-    if not re.fullmatch(r"[0-9a-f]{64}", digest):
-        raise ValueError("A full SHA-256 hash is required")
-    if decision not in ("allow", "deny"):
-        raise ValueError("Trust decision must be allow or deny")
-    TRUST.parent.mkdir(parents=True, exist_ok=True)
-    lines = TRUST.read_text(encoding="ascii").splitlines() if TRUST.is_file() else []
-    lines = [line for line in lines if not re.match(rf"^\s*{digest}\s*=", line)]
-    lines.extend([f"# Updated by KnoxBridge Setup {__import__('datetime').datetime.now().astimezone().isoformat()}",
-                  f"{digest}={decision}"])
-    TRUST.write_text("\n".join(lines) + "\n", encoding="ascii")
-
-
-def approve():
-    if not LOG.is_file():
-        raise RuntimeError(f"No runtime log found at {LOG}. Install, enable a Java module, and launch once first.")
-    lines = LOG.read_text(encoding="utf-8", errors="replace").splitlines()
-    starts = [i for i, line in enumerate(lines) if "KnoxBridge runtime start PASS" in line]
-    if not starts:
-        print("No game-launch session was found in the KnoxBridge log.")
-        return
-    lines = lines[starts[-1]:]
-    discovered = {}
-    for line in lines:
-        m = re.search(r"module discovered id=(\S+) source=.*? hash=([0-9a-f]{64})", line)
-        if m: discovered[m.group(2)] = m.group(1)
-    modules = [(mod, digest) for digest, mod in discovered.items()]
-    if not modules:
-        print("No Java modules were discovered during the last game launch.")
-        return
-    for mod, digest in modules:
-        print(f"Module: {mod}\nSHA-256: {digest}")
-        if TRUST.is_file():
-            saved = [m.group(1) for line in TRUST.read_text(encoding="ascii").splitlines()
-                     if (m := re.match(rf"^\s*{digest}=(allow|deny)$", line))]
-            if saved: print(f"Current saved decision: {saved[-1]}")
-        answer = input("Type ALLOW to trust, DENY to block this exact JAR, or press Enter to skip: ").strip().lower()
-        if answer in ("allow", "deny"):
-            save_trust_decision(digest, answer)
-            print(f"Saved {answer} for this exact JAR hash. Restart the game to apply it.")
-        else:
-            print("No trust decision changed.")
 
 
 def uninstall():
@@ -265,21 +218,19 @@ def menu():
     while True:
         print("\nKnoxBridge Setup")
         print("1. Install or update KnoxBridge Runtime")
-        print("2. Manage module trust decisions from the last game launch")
-        print("3. Uninstall KnoxBridge")
-        print("4. Exit")
-        choice = input("Choose 1-4: ").strip()
+        print("2. Uninstall KnoxBridge")
+        print("3. Exit")
+        choice = input("Choose 1-3: ").strip()
         try:
             if choice == "1":
                 if input("Close Steam before setup? (Y/n): ").strip().lower() not in ("", "y", "yes"):
                     continue
                 install()
-            elif choice == "2": approve()
-            elif choice == "3":
+            elif choice == "2":
                 if input("Remove KnoxBridge startup setup? (Y/n): ").strip().lower() in ("", "y", "yes"):
                     uninstall()
-            elif choice == "4": return
-            else: print("Choose 1, 2, 3, or 4.")
+            elif choice == "3": return
+            else: print("Choose 1, 2, or 3.")
         except (OSError, ValueError, KeyError, IndexError, RuntimeError) as error:
             print(f"Setup stopped safely: {error}")
 

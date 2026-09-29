@@ -21,7 +21,7 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 
 - Selects Java modules from active Project Zomboid mod roots, so disabled Workshop mods are not loaded just because their files are installed.
 - Adds setup controls to ALLOW or DENY a module's exact JAR SHA-256 from the most recent launch; blank input leaves the decision unchanged.
-- Keeps KnoxBridge independent of Knox Survivors gameplay and ZombieBuddy code. Use only one Java runtime agent at a time; do not stack KnoxBridge with ZombieBuddy.
+- Keeps KnoxBridge independent of Knox Survivors gameplay. Use only one Java instrumentation runtime at a time.
 - Windows download: `KnoxBridgeSetup.exe` (self-contained setup; uses the game's bundled Java). Linux/macOS download: `KnoxBridgeRuntime-0.1.0-alpha4.zip` (Python 3 helper; close Steam while changing its config).
 - Unknown or changed module hashes remain blocked until the player explicitly allows that exact file. Java modules have the same permissions as the game and are not sandboxed.
 - Offline packaging and verifier checks pass. The alpha4 package has not yet had its own live Build 42 acceptance run. Linux/macOS still require native live testing.
@@ -40,5 +40,16 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Unknown Java modules now trigger a modal startup approval dialog before their JAR is loaded.
 - The dialog shows the KnoxBridge module ID, exact JAR SHA-256, PZ mod name, and any declared author. Author text is explicitly unverified metadata, not authenticated identity.
 - Allow and deny decisions are saved only for the displayed exact JAR hash. Skip, closing the window, headless execution, or UI errors leave the module blocked.
-- Installer option 2 and the Unix helper trust menu remain available as fallback when the graphical dialog cannot be shown.
+- Earlier installer builds included a terminal trust fallback; the alpha7 source candidate removes that path in favor of the KnoxBridge Workshop review screen.
+
+# KnoxBridge Runtime 0.1.0-alpha7 source candidate
+- Replace per-JAR desktop approval dialogs with the KnoxBridge Workshop main-menu review UI.
+- Inventory JAR files beneath Project Zomboid-enabled mod roots; unknown hashes remain blocked by default.
+- Save exact-hash allow/deny choices in a versioned handoff file and import them before the next Java module load.
+- Show unsupported JAR files as not Bridge-compatible; do not load arbitrary JARs without a KnoxBridge descriptor/API entry point.
+- Require updated KnoxBridge runtime and Workshop uploads; no Knox Survivors code change is involved.
+- Simplify Windows and Linux/macOS setup menus to install/update, uninstall, and exit; trust decisions are no longer managed by setup.
+- The installer verifies bundled runtime JAR and Windows bootstrap checksums. This is package integrity validation, not a publisher signature or antivirus guarantee.
+- Build 42 UI visibility, file-path access, and end-to-end restart acceptance remain unverified.
+- Windows Defender has flagged a local unsigned setup build; do not release or run a flagged build. A fresh approved scan and live Build 42 replay are required before publishing binaries.
 - Offline decision and metadata checks pass. Visibility/focus during real PZ startup and full Build 42 acceptance remain live-unverified.

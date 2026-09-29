@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$GameDirectory,
-    [string]$AgentJarPath = (Join-Path $PSScriptRoot '..\runtime-core\build\libs\knoxbridge-agent-0.1.0-alpha6.jar'),
+    [string]$AgentJarPath = (Join-Path $PSScriptRoot '..\runtime-core\build\libs\knoxbridge-agent-0.1.0-alpha7.jar'),
     [string]$BootstrapDllPath = (Join-Path $PSScriptRoot '..\bootstrap-windows\build\knoxbridge-bootstrap.dll')
 )
 $ErrorActionPreference = 'Stop'
@@ -9,7 +9,7 @@ $jsonPath = Join-Path $game 'ProjectZomboid64.json'
 if (!(Test-Path -LiteralPath $jsonPath -PathType Leaf)) { throw "ProjectZomboid64.json not found in $game" }
 $batchPath = Join-Path $game 'ProjectZomboid64.bat'
 if (Test-Path -LiteralPath $batchPath -PathType Leaf) {
-    $batchBootstrap = Get-Content -LiteralPath $batchPath -Raw | Select-String -Pattern '(?i)(javaagent:|agentlib:zbNative|ZombieBuddy)'
+    $batchBootstrap = Get-Content -LiteralPath $batchPath -Raw | Select-String -Pattern '(?i)(javaagent:|agentpath:|agentlib:)'
     if ($batchBootstrap) { throw 'A Java runtime bootstrap appears in ProjectZomboid64.bat. Remove that runtime before installing KnoxBridge.' }
 }
 if (!(Test-Path -LiteralPath $AgentJarPath -PathType Leaf)) { throw "KnoxBridge agent JAR not found: $AgentJarPath" }
@@ -48,10 +48,10 @@ if ($hadState) {
     $bootstrapArg = [string]$state.bootstrapArgument
     if (!(Test-Path -LiteralPath $backupPath -PathType Leaf)) { throw 'KnoxBridge backup is missing; refusing repair.' }
 } else {
-    $conflict = $args | Where-Object { $_ -match '(?i)(javaagent:|agentpath:|agentlib:zbNative|ZombieBuddy)' }
+    $conflict = $args | Where-Object { $_ -match '(?i)(javaagent:|agentpath:|agentlib:)' }
     if ($conflict) { throw 'A Java runtime bootstrap is already configured. Remove that runtime before installing KnoxBridge.' }
 }
-$otherBootstrap = $allVmArgs | Where-Object { $_ -ne $agentArg -and $_ -ne $bootstrapArg -and $_ -match '(?i)(javaagent:|agentpath:|agentlib:zbNative|ZombieBuddy)' }
+$otherBootstrap = $allVmArgs | Where-Object { $_ -ne $agentArg -and $_ -ne $bootstrapArg -and $_ -match '(?i)(javaagent:|agentpath:|agentlib:)' }
 if ($otherBootstrap) { throw 'Another Java runtime bootstrap is present in the game JSON. Remove it before installing KnoxBridge.' }
 if (!$hadState -and ($args -contains $agentArg -or $args -contains $bootstrapArg)) { throw 'An unmanaged KnoxBridge bootstrap entry already exists; refusing to claim it.' }
 $args = @($args | Where-Object { $_ -ne $agentArg -and $_ -ne $bootstrapArg }) + @($bootstrapArg, $agentArg)
@@ -69,6 +69,6 @@ Move-Item -LiteralPath $tmp -Destination $jsonPath -Force
 $sha = (Get-FileHash -LiteralPath $installedAgent -Algorithm SHA256).Hash.ToLowerInvariant()
 $bootstrapSha = (Get-FileHash -LiteralPath $installedBootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
 $jsonSha = (Get-FileHash -LiteralPath $jsonPath -Algorithm SHA256).Hash.ToLowerInvariant()
-$state = [ordered]@{ owner='KnoxBridge Runtime'; version='0.1.0-alpha6'; agentArgument=$agentArg; agentSha256=$sha; bootstrapArgument=$bootstrapArg; bootstrapSha256=$bootstrapSha; installedJsonSha256=$jsonSha; userEditsPreserved=$userEditsPreserved; installedAt=[DateTime]::UtcNow.ToString('o') }
+$state = [ordered]@{ owner='KnoxBridge Runtime'; version='0.1.0-alpha7'; agentArgument=$agentArg; agentSha256=$sha; bootstrapArgument=$bootstrapArg; bootstrapSha256=$bootstrapSha; installedJsonSha256=$jsonSha; userEditsPreserved=$userEditsPreserved; installedAt=[DateTime]::UtcNow.ToString('o') }
 [System.IO.File]::WriteAllText($statePath, ($state | ConvertTo-Json -Depth 5) + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
 Write-Output "KnoxBridge install PASS game=$game sha256=$sha"

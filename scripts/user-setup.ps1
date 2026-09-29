@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $package = Split-Path -Parent $PSScriptRoot
-$agent = Join-Path $package 'knoxbridge-agent-0.1.0-alpha6.jar'
+$agent = Join-Path $package 'knoxbridge-agent-0.1.0-alpha7.jar'
 $bootstrap = Join-Path $package 'bootstrap-windows\knoxbridge-bootstrap.dll'
 $exampleSource = Join-Path $package 'example-mod\KnoxBridgeIndependentTest'
 $logPath = Join-Path $env:USERPROFILE 'Zomboid\KnoxBridge\knoxbridge.log'
@@ -51,7 +51,7 @@ function Install-KnoxBridge {
     Write-Host ''
     Write-Host 'KnoxBridge is installed. No Steam Launch Options are needed; start Project Zomboid normally with Steam Play.'
     Write-Host 'For Knox Survivors, enable Knox Survivors in the PZ Mods menu; KnoxBridge Runtime is its required Workshop dependency.'
-    Write-Host 'On first game startup, KnoxBridge prompts before loading each unknown module. If the prompt cannot appear, close the game, return here, choose “Manage module trust”, then ALLOW or DENY the exact hash (or skip) and relaunch.'
+    Write-Host 'At the Project Zomboid main menu, use the KnoxBridge Workshop mod’s Review Java Mods screen to allow or keep compatible JARs denied. Decisions apply after a full restart; unsupported JARs remain blocked.'
     if (Test-Path -LiteralPath $exampleSource) { Write-Host 'For independent runtime testing, enable the optional KnoxBridge Independent Test Module in the PZ Mods menu.' }
 }
 
@@ -103,18 +103,16 @@ while ($true) {
     Clear-Host
     Write-Host 'KnoxBridge Setup'
     Write-Host '1. Install or update KnoxBridge Runtime'
-    Write-Host '2. Manage module trust decisions from the last game launch'
-    Write-Host '3. Uninstall KnoxBridge'
-    Write-Host '4. Exit'
-    $choice = Read-Host 'Choose 1-4'
+    Write-Host '2. Uninstall KnoxBridge'
+    Write-Host '3. Exit'
+    $choice = Read-Host 'Choose 1-3'
     try {
         switch ($choice) {
             '1' { Install-KnoxBridge }
-            '2' { Approve-LoggedModules }
-            '3' { Remove-KnoxBridge }
-            '4' { return }
-            default { Write-Host 'Choose 1, 2, 3, or 4.' }
+            '2' { Remove-KnoxBridge }
+            '3' { return }
+            default { Write-Host 'Choose 1, 2, or 3.' }
         }
     } catch { Write-Host "`nSetup stopped safely: $($_.Exception.Message)" }
-    if ($choice -ne '4') { Write-Host ''; [void](Read-Host 'Press Enter to return to the menu') }
+    if ($choice -ne '3') { Write-Host ''; [void](Read-Host 'Press Enter to return to the menu') }
 }

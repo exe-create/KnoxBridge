@@ -2,15 +2,15 @@ package com.knoxbridge.runtime;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.function.Consumer;
 
-/** Resolves only IDs returned by PZ's active getModIDs() list. */
+/** Resolves only roots returned by PZ's active getModIDs() list. */
 final class PzModDiscovery {
     static List<Path> resolve(Object fileSystem, Collection<?> activeIds, Consumer<String> log) {
-        List<Path> roots = new ArrayList<>();
+        LinkedHashSet<Path> roots = new LinkedHashSet<>();
         try {
             var getDirectory = fileSystem.getClass().getMethod("getModDir", String.class);
             var getInfo = fileSystem.getClass().getMethod("getModInfoForDir", String.class);
@@ -28,13 +28,13 @@ final class PzModDiscovery {
                     String versionDir = (String) info.getClass().getMethod("getVersionDir").invoke(info);
                     Path selected = versionDir == null || versionDir.isBlank() ? base : base.resolve(versionDir);
                     selected = selected.toAbsolutePath().normalize();
-                    if (Files.isRegularFile(selected.resolve("knoxbridge.properties"))) {
+                    if (Files.isDirectory(selected)) {
                         roots.add(selected);
                         log.accept("enabled mod root id=" + id + " path=" + selected);
-                    } else if (Files.isRegularFile(base.resolve("knoxbridge.properties"))) {
+                    } else if (Files.isDirectory(base)) {
                         roots.add(base.toAbsolutePath().normalize());
                         log.accept("enabled mod root id=" + id + " path=" + base.toAbsolutePath().normalize());
-                    } else log.accept("enabled mod no java descriptor id=" + id);
+                    } else log.accept("enabled mod root unavailable id=" + id);
                 } catch (Throwable failure) {
                     log.accept("enabled mod resolve failed id=" + id + " reason=" + failure);
                 }

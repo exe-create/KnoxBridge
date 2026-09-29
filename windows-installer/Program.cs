@@ -13,8 +13,6 @@ internal static class Program
     private const string Owner = "KnoxBridge Runtime";
     private const string AgentFile = "knoxbridge-agent.jar";
     private const string BootstrapFile = "knoxbridge-bootstrap.dll";
-    private const string LogFile = "knoxbridge.log";
-    private const string TrustFile = "trust.properties";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
 
     private static int Main(string[] args)
@@ -36,14 +34,13 @@ internal static class Program
                 Console.Clear();
                 Console.WriteLine("KnoxBridge Setup");
                 Console.WriteLine("This setup modifies only KnoxBridge-owned files and Project Zomboid startup configuration.");
-                Console.WriteLine("Close Project Zomboid before installing, changing trust, or uninstalling.");
+                Console.WriteLine("Close Project Zomboid before installing or uninstalling.");
                 Console.WriteLine("Java modules have the same permissions as Project Zomboid; approve only code you trust.");
                 Console.WriteLine();
                 Console.WriteLine("1. Install or update KnoxBridge Runtime");
-                Console.WriteLine("2. Manage module trust from the latest game log");
-                Console.WriteLine("3. Uninstall KnoxBridge");
-                Console.WriteLine("4. Exit");
-                Console.Write("Choose 1-4: ");
+                Console.WriteLine("2. Uninstall KnoxBridge");
+                Console.WriteLine("3. Exit");
+                Console.Write("Choose 1-3: ");
                 switch (Console.ReadLine()?.Trim())
                 {
                     case "1": RunAction(() =>
@@ -53,16 +50,15 @@ internal static class Program
                             InstallerCore.Install(game, payload);
                         else Console.WriteLine("Install cancelled; no files were changed.");
                     }); break;
-                    case "2": RunAction(ManageTrust); break;
-                    case "3": RunAction(() =>
+                    case "2": RunAction(() =>
                     {
                         var game = FindGameFolder();
                         if (Confirm($"Uninstall KnoxBridge from:\n{game}\n\nOnly KnoxBridge-owned startup arguments and files will be removed."))
                             InstallerCore.Uninstall(game);
                         else Console.WriteLine("Uninstall cancelled; no files were changed.");
                     }); break;
-                    case "4": return 0;
-                    default: Console.WriteLine("Choose 1, 2, 3, or 4."); Pause(); break;
+                    case "3": return 0;
+                    default: Console.WriteLine("Choose 1, 2, or 3."); Pause(); break;
                 }
             }
         }
@@ -117,57 +113,6 @@ internal static class Program
             if (File.Exists(Path.Combine(full, "ProjectZomboid64.json"))) return full;
             Console.WriteLine("That folder does not contain ProjectZomboid64.json.");
         }
-    }
-
-    private static void ManageTrust()
-    {
-        EnsureGameClosed();
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Zomboid", "KnoxBridge");
-        var log = Path.Combine(root, LogFile);
-        var trust = Path.Combine(root, TrustFile);
-        if (!File.Exists(log)) throw new FileNotFoundException($"No KnoxBridge log found at {log}. Launch Project Zomboid with an enabled Java module first.");
-        var found = ParseLatestModules(File.ReadAllLines(log));
-        if (found.Count == 0) { Console.WriteLine("No Java modules were discovered in the latest runtime session."); return; }
-
-        foreach (var (hash, id) in found)
-        {
-            Console.WriteLine($"\nModule: {id}\nSHA-256: {hash}");
-            var prior = ReadTrust(trust).LastOrDefault(x => x.StartsWith(hash + "=", StringComparison.OrdinalIgnoreCase));
-            if (prior != null) Console.WriteLine($"Current saved decision: {prior[(prior.IndexOf('=') + 1)..]}");
-            Console.Write("Type ALLOW to trust, DENY to block this exact JAR hash, or press Enter to skip: ");
-            var answer = Console.ReadLine()?.Trim();
-            if (string.Equals(answer, "ALLOW", StringComparison.Ordinal)) SetTrust(trust, hash, "allow");
-            else if (string.Equals(answer, "DENY", StringComparison.Ordinal)) SetTrust(trust, hash, "deny");
-            else Console.WriteLine("No trust decision changed.");
-        }
-    }
-
-    private static List<string> ReadTrust(string path) => File.Exists(path) ? File.ReadAllLines(path).ToList() : new List<string>();
-
-    private static Dictionary<string, string> ParseLatestModules(IEnumerable<string> input)
-    {
-        var lines = input.ToArray();
-        var start = Array.FindLastIndex(lines, line => line.Contains("KnoxBridge runtime start PASS", StringComparison.Ordinal));
-        var found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (start < 0) return found;
-        var pattern = new Regex(@"module discovered id=(\S+) source=(.*?) hash=([0-9a-f]{64})", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        foreach (var line in lines.Skip(start))
-        {
-            var match = pattern.Match(line);
-            if (match.Success) found[match.Groups[3].Value.ToLowerInvariant()] = match.Groups[1].Value;
-        }
-        return found;
-    }
-
-    private static void SetTrust(string path, string hash, string decision)
-    {
-        if (!Regex.IsMatch(hash, "^[0-9a-fA-F]{64}$", RegexOptions.CultureInvariant)) throw new InvalidDataException("A full SHA-256 hash is required.");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var lines = ReadTrust(path).Where(line => !Regex.IsMatch(line, "^\\s*" + Regex.Escape(hash) + "\\s*=", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)).ToList();
-        lines.Add($"# Updated by KnoxBridge Setup {DateTimeOffset.Now:O}");
-        lines.Add($"{hash.ToLowerInvariant()}={decision}");
-        AtomicWrite(path, Encoding.ASCII.GetBytes(string.Join(Environment.NewLine, lines) + Environment.NewLine));
-        Console.WriteLine($"Saved {decision} for this exact JAR hash. Restart Project Zomboid to apply it.");
     }
 
     private static void EnsureGameClosed()
@@ -268,7 +213,7 @@ internal static class Program
             var bootstrapArg = prior?.BootstrapArgument ?? "-agentpath:" + bootstrapPath;
             var allArgs = EnumerateVmArgs(root).ToList();
             var otherBootstrap = allArgs.Where(arg => arg != agentArg && arg != bootstrapArg).FirstOrDefault(IsRuntimeArgument);
-            if (otherBootstrap != null) throw new InvalidOperationException("Another Java runtime is configured. Remove it before installing KnoxBridge; do not stack KnoxBridge with ZombieBuddy.");
+            if (otherBootstrap != null) throw new InvalidOperationException("Another Java instrumentation runtime is configured. Remove it before installing KnoxBridge; only one runtime can own startup.");
             if (!hadState && vmArgs.Select(StringValue).Any(IsRuntimeArgument))
                 throw new InvalidOperationException("A Java runtime is already configured in the main launcher options. Remove it before installing KnoxBridge.");
             if (!hadState && (vmArgs.Select(StringValue).Contains(agentArg) || vmArgs.Select(StringValue).Contains(bootstrapArg)))
@@ -294,7 +239,7 @@ internal static class Program
                 AtomicWrite(jsonPath, nextJson);
                 AtomicWrite(statePath, stateBytes);
                 Console.WriteLine($"KnoxBridge installed. Agent SHA-256: {nextState.AgentSha256}");
-                Console.WriteLine("Enable Knox Survivors in the PZ Mods menu and start through Steam. Unknown Java modules remain blocked until you explicitly approve their exact hash.");
+                Console.WriteLine("Enable KnoxBridge Runtime and Knox Survivors in the PZ Mods menu, then start through Steam. Review Java modules in the Bridge main-menu screen; unknown hashes remain blocked by default.");
             }
             catch
             {
@@ -363,7 +308,7 @@ internal static class Program
         }
 
         private static string StringValue(JsonNode? node) => node?.GetValue<string>() ?? string.Empty;
-        private static bool IsRuntimeArgument(string arg) => Regex.IsMatch(arg, "(?i)(javaagent:|agentpath:|agentlib:zbNative|ZombieBuddy)", RegexOptions.CultureInvariant);
+        private static bool IsRuntimeArgument(string arg) => Regex.IsMatch(arg, "(?i)(javaagent:|agentpath:|agentlib:)", RegexOptions.CultureInvariant);
         private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         private static void RestoreFile(string path, byte[]? old) { if (old == null) File.Delete(path); else AtomicWrite(path, old); }
 
@@ -380,6 +325,13 @@ internal static class Program
                 var original = Encoding.UTF8.GetBytes("{\"mainClass\":\"zombie/gameStates/MainScreenState\",\"classpath\":[\".\",\"projectzomboid.jar\"],\"vmArgs\":[\"-Xmx4g\",\"-Duser=preserve\"]}");
                 var agent = new byte[] { 1, 2, 3, 4 }; var bootstrap = new byte[] { 5, 6, 7, 8 };
                 var payload = new InstallerPayload(agent, bootstrap, "self-test");
+                var checkedArchive = MakePackageArchive(agent, bootstrap, corruptChecksum: false);
+                var checkedPayload = InstallerPayload.Parse(checkedArchive);
+                Check(checkedPayload.Agent.SequenceEqual(agent) && checkedPayload.Bootstrap.SequenceEqual(bootstrap), "installer accepts checksum-verified Java agent and bootstrap payload");
+                var corruptArchive = MakePackageArchive(agent, bootstrap, corruptChecksum: true);
+                var checksumBlocked = false;
+                try { InstallerPayload.Parse(corruptArchive); } catch (InvalidDataException) { checksumBlocked = true; }
+                Check(checksumBlocked, "installer rejects a mismatched bundled runtime checksum");
                 var game = Path.Combine(temp, "game"); Directory.CreateDirectory(game);
                 File.WriteAllBytes(Path.Combine(game, "ProjectZomboid64.json"), original);
 
@@ -398,26 +350,10 @@ internal static class Program
                 InstallerCore.Uninstall(game);
                 var afterEdit = JsonNode.Parse(File.ReadAllBytes(Path.Combine(game, "ProjectZomboid64.json")))!.AsObject();
                 var remainingArgs = afterEdit["vmArgs"]!.AsArray().Select(node => node?.GetValue<string>() ?? string.Empty).ToArray();
-                Check(remainingArgs.Contains("-Duser=edit") && !remainingArgs.Any(arg => Regex.IsMatch(arg, "(?i)(javaagent:|agentpath:|agentlib:zbNative|ZombieBuddy)")), "uninstall preserves user edits and removes only KnoxBridge args");
-
-                var staleHash = new string('a', 64); var currentHash = new string('b', 64);
-                var modules = ParseLatestModules(new[]
-                {
-                    "KnoxBridge runtime start PASS version=old",
-                    $"module discovered id=stale source=old.jar hash={staleHash}",
-                    "KnoxBridge runtime start PASS version=current",
-                    $"module discovered id=current source=current.jar hash={currentHash}"
-                });
-                Check(modules.Count == 1 && modules.TryGetValue(currentHash, out var currentId) && currentId == "current", "trust manager reads only the latest runtime session");
-                var trustPath = Path.Combine(temp, "profile", "trust.properties");
-                SetTrust(trustPath, currentHash, "allow"); SetTrust(trustPath, staleHash, "deny"); SetTrust(trustPath, currentHash, "deny");
-                var savedTrust = ReadTrust(trustPath);
-                Check(savedTrust.Count(line => line.Equals(currentHash + "=deny", StringComparison.OrdinalIgnoreCase)) == 1 &&
-                    savedTrust.Count(line => line.Equals(currentHash + "=allow", StringComparison.OrdinalIgnoreCase)) == 0 &&
-                    savedTrust.Contains(staleHash + "=deny"), "trust decisions update exact hashes without losing other modules");
+                Check(remainingArgs.Contains("-Duser=edit") && !remainingArgs.Any(arg => Regex.IsMatch(arg, "(?i)(javaagent:|agentpath:|agentlib:)", RegexOptions.CultureInvariant)), "uninstall preserves user edits and removes only KnoxBridge args");
 
                 var conflictGame = Path.Combine(temp, "conflict"); Directory.CreateDirectory(conflictGame);
-                var conflictJson = Encoding.UTF8.GetBytes("{\"vmArgs\":[\"-agentlib:zbNative\"]}");
+                var conflictJson = Encoding.UTF8.GetBytes("{\"vmArgs\":[\"-agentlib:exampleRuntime\"]}");
                 File.WriteAllBytes(Path.Combine(conflictGame, "ProjectZomboid64.json"), conflictJson);
                 var blocked = false;
                 try { InstallerCore.Install(conflictGame, payload); } catch (InvalidOperationException) { blocked = true; }
@@ -445,6 +381,31 @@ internal static class Program
         private static void Check(bool condition, string description)
         {
             if (!condition) throw new InvalidOperationException("Self-test failed: " + description);
+        }
+
+        private static byte[] MakePackageArchive(byte[] agent, byte[] bootstrap, bool corruptChecksum)
+        {
+            using var output = new MemoryStream();
+            using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                var agentName = "knoxbridge-agent-0.1.0-alpha7.jar";
+                AddEntry(archive, agentName, agent);
+                var agentHash = Convert.ToHexString(SHA256.HashData(corruptChecksum ? new byte[] { 0 } : agent)).ToLowerInvariant();
+                AddEntry(archive, agentName + ".sha256", Encoding.ASCII.GetBytes(agentHash + "  " + agentName + "\n"));
+
+                const string bootstrapName = "bootstrap-windows/knoxbridge-bootstrap.dll";
+                AddEntry(archive, bootstrapName, bootstrap);
+                var bootstrapHash = Convert.ToHexString(SHA256.HashData(bootstrap)).ToLowerInvariant();
+                AddEntry(archive, bootstrapName + ".sha256", Encoding.ASCII.GetBytes(bootstrapHash + "  " + bootstrapName + "\n"));
+            }
+            return output.ToArray();
+        }
+
+        private static void AddEntry(ZipArchive archive, string name, byte[] bytes)
+        {
+            var entry = archive.CreateEntry(name);
+            using var stream = entry.Open();
+            stream.Write(bytes, 0, bytes.Length);
         }
     }
 }

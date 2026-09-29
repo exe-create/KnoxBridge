@@ -1,12 +1,13 @@
 param(
     [string]$Installer = (Join-Path $PSScriptRoot '..\bootstrap-windows\build\KnoxBridgeSetup.exe'),
-    [string]$PackageZip = (Join-Path $PSScriptRoot '..\build\distributions\KnoxBridgeRuntime-0.1.0-alpha6.zip')
+    [string]$PackageZip = (Join-Path $PSScriptRoot '..\build\distributions\KnoxBridgeRuntime-0.1.0-alpha7.zip')
 )
 $ErrorActionPreference = 'Stop'
 $installerSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\windows-installer\Program.cs') -Raw
 if ($installerSource -match '(?i)(powershell\.exe|cmd\.exe|CreateProcessW|Process\.Start)') {
     throw 'The Windows installer must not start a command interpreter or PowerShell child process.'
 }
+if ($installerSource -match 'Manage module trust') { throw 'Module allow/deny decisions belong to the Bridge in-game UI, not the installer.' }
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
 $zipPath = (Resolve-Path -LiteralPath $PackageZip).Path
 $expected = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()

@@ -14,7 +14,7 @@ import java.lang.management.ManagementFactory;
 /** Early JVM bootstrap and PZ-specific adapter owner. */
 public final class KnoxBridgeAgent {
     private static final String VERSION = KnoxBridgeAgent.class.getPackage().getImplementationVersion() == null
-        ? "0.1.0-alpha6" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
+        ? "0.1.0-alpha7" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
     private static final AtomicBoolean STARTED = new AtomicBoolean();
     private static final AtomicBoolean MODULES_STARTED = new AtomicBoolean();
     private static final List<ModuleLoader.LoadedModule> LOADED = new CopyOnWriteArrayList<>();
@@ -36,7 +36,7 @@ public final class KnoxBridgeAgent {
         List<String> inputArgs = ManagementFactory.getRuntimeMXBean().getInputArguments();
         if (hasCompetingBootstrap(inputArgs)) {
             log.write("runtime conflict reason=another-java-runtime-active action=knoxbridge-disabled args="
-                + inputArgs.stream().filter(a -> a.toLowerCase().contains("javaagent") || a.toLowerCase().contains("agentlib:zbNative")).toList());
+                + inputArgs.stream().filter(a -> a.toLowerCase().contains("javaagent") || a.toLowerCase().contains("agentlib:")).toList());
             return;
         }
         String explicitRoots = System.getProperty("knoxbridge.enabledModPaths", "");
@@ -86,7 +86,7 @@ public final class KnoxBridgeAgent {
     static boolean hasCompetingBootstrap(List<String> inputArgs) {
         return inputArgs.stream().anyMatch(arg -> {
             String lower = arg.toLowerCase();
-            return lower.contains("agentlib:zbnative")
+            return lower.contains("agentlib:")
                 || (lower.startsWith("-agentpath:") && !lower.contains("knoxbridge-bootstrap"))
                 || (lower.startsWith("-javaagent:") && !lower.contains("knoxbridge-agent"));
         });
@@ -109,28 +109,82 @@ public final class KnoxBridgeAgent {
         TrustStore trust;
         try { trust = new TrustStore(trustPath); }
         catch (Exception e) { log.write("runtime fatal reason=trust-store-unavailable error=" + e); return; }
+        try { ModuleReviewFiles.applyQueuedDecisions(trust, ModuleReviewFiles.decisionsPath(), log::write); }
+        catch (Exception e) { log.write("module review queue failed reason=" + e + "; unknown modules remain blocked"); }
+        List<ModuleReviewFiles.Entry> reviewEntries = new ArrayList<>();
         for (ModuleDiscovery.Candidate candidate : candidates) {
             ModuleDescriptor d = candidate.descriptor();
-            if (d == null || candidate.problem() != null) continue;
-            if (!"1".equals(d.apiVersion())) { log.write("module incompatible id=" + d.id() + " reason=api-version"); continue; }
+            if (d == null) {
+                String hash = "";
+                try { if (candidate.jar() != null) hash = Hashing.sha256(candidate.jar()); }
+                catch (Throwable failure) { log.write("module inspection failed path=" + candidate.jar() + " reason=" + failure); }
+                String state = isBridgeCompileApi(candidate)
+                    ? "NOT A MODULE: KnoxBridge compile-time API only"
+                    : "NOT BRIDGE-COMPATIBLE: " + candidate.problem();
+                if (ModuleReviewFiles.isValidHash(hash)) {
+                    try {
+                        TrustStore.Decision saved = trust.check(hash);
+                        if (saved == TrustStore.Decision.DENY_EXACT || saved == TrustStore.Decision.DENY_ONCE)
+                            state = "NOT BRIDGE-COMPATIBLE / DENIED";
+                        else if (saved == TrustStore.Decision.ALLOW_EXACT || saved == TrustStore.Decision.ALLOW_ONCE)
+                            state = "NOT BRIDGE-COMPATIBLE / PRIOR ALLOW IGNORED";
+                    } catch (Throwable failure) { log.write("module trust lookup failed path=" + candidate.jar() + " reason=" + failure); }
+                }
+                reviewEntries.add(ModuleReviewFiles.entry(candidate, hash,
+                    state));
+                continue;
+            }
             try {
                 String hash = Hashing.sha256(d.jar());
                 trust.observe(hash, d.id(), candidate.modRoot());
                 log.write("module discovered id=" + d.id() + " source=" + candidate.modRoot() + " hash=" + hash);
-                TrustStore.Decision decision = trust.check(hash);
-                if (decision == TrustStore.Decision.APPROVAL_REQUIRED) {
-                    decision = ModuleApprovalDialog.prompt(d, candidate.modRoot(), hash, log::write);
-                    ModuleApprovalDialog.persistDecision(trust, hash, decision);
-                }
-                if (decision != TrustStore.Decision.ALLOW_ONCE && decision != TrustStore.Decision.ALLOW_EXACT) {
-                    log.write("module blocked id=" + d.id() + " decision=" + decision);
+                if (candidate.problem() != null) {
+                    log.write("module incompatible id=" + d.id() + " reason=" + candidate.problem());
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "INCOMPATIBLE: " + candidate.problem()));
                     continue;
                 }
-                LOADED.add(ModuleLoader.load(d, d.jar(), VERSION, patchEngine, instrumentation, log::write));
-            } catch (Throwable failure) { log.write("module failed id=" + d.id() + " reason=" + failure); }
+                if (!"1".equals(d.apiVersion())) {
+                    log.write("module incompatible id=" + d.id() + " reason=api-version");
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "INCOMPATIBLE: API version"));
+                    continue;
+                }
+                TrustStore.Decision decision = trust.check(hash);
+                if (decision == TrustStore.Decision.APPROVAL_REQUIRED) {
+                    log.write("module blocked id=" + d.id() + " decision=" + decision);
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "BLOCKED BY DEFAULT"));
+                    continue;
+                }
+                if (decision == TrustStore.Decision.DENY_ONCE || decision == TrustStore.Decision.DENY_EXACT) {
+                    log.write("module blocked id=" + d.id() + " decision=" + decision);
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "DENIED"));
+                    continue;
+                }
+                try {
+                    LOADED.add(ModuleLoader.load(d, d.jar(), VERSION, patchEngine, instrumentation, log::write));
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "ALLOWED"));
+                } catch (Throwable failure) {
+                    log.write("module failed id=" + d.id() + " reason=" + failure);
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "LOAD FAILED"));
+                }
+            } catch (Throwable failure) {
+                log.write("module failed id=" + d.id() + " reason=" + failure);
+                reviewEntries.add(ModuleReviewFiles.entry(candidate, "", "LOAD FAILED"));
+            }
         }
+        try { ModuleReviewFiles.writeManifest(ModuleReviewFiles.manifestPath(), reviewEntries); }
+        catch (Exception e) { log.write("module review manifest failed reason=" + e + "; in-game module review unavailable"); }
         retransformRegisteredTargets();
         log.write("runtime ready modules=" + LOADED.size());
+    }
+
+    private static boolean isBridgeCompileApi(ModuleDiscovery.Candidate candidate) {
+        if (candidate.jar() == null || candidate.modRoot().getFileName() == null
+                || !"KnoxBridgeRuntime".equalsIgnoreCase(candidate.modRoot().getFileName().toString())) return false;
+        Path relative;
+        try { relative = candidate.modRoot().toAbsolutePath().normalize().relativize(candidate.jar().toAbsolutePath().normalize()); }
+        catch (IllegalArgumentException e) { return false; }
+        String normalized = relative.toString().replace('\\', '/').toLowerCase(java.util.Locale.ROOT);
+        return normalized.startsWith("developer/lib/runtime-api-");
     }
 
     private static void retransformRegisteredTargets() {

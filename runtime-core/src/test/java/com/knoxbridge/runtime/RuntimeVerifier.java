@@ -13,6 +13,8 @@ public final class RuntimeVerifier {
         Files.copy(moduleJar, mod.resolve("knoxbridge-example-module.jar"));
         Files.writeString(mod.resolve("mod.info"), "name=Example Java Mod\nauthor=Example Author\n");
         Files.writeString(mod.resolve("knoxbridge.properties"), "id=org.example.knoxbridge.greeting\nversion=1.0.0\napiVersion=1\nentrypoint=org.example.knoxbridge.ExampleModule\njar=knoxbridge-example-module.jar\n");
+        Path helperJar = Files.createDirectories(mod.resolve("lib")).resolve("helper.jar");
+        Files.copy(moduleJar, helperJar);
         Path disabled = Files.createDirectories(temp.resolve("disabled-mod"));
         Files.copy(mod.resolve("knoxbridge.properties"), disabled.resolve("knoxbridge.properties"));
         Path duplicate = Files.createDirectories(temp.resolve("duplicate-mod"));
@@ -20,35 +22,52 @@ public final class RuntimeVerifier {
         Files.copy(mod.resolve("knoxbridge-example-module.jar"), duplicate.resolve("knoxbridge-example-module.jar"));
 
         List<ModuleDiscovery.Candidate> candidates = ModuleDiscovery.inspectEnabledRoots(List.of(mod), s -> { });
-        String hash = Hashing.sha256(candidates.get(0).descriptor().jar());
-        check(candidates.size() == 1 && candidates.get(0).problem() == null, "enabled-root discovery");
-        check(ModuleDiscovery.inspectEnabledRoots(List.of(disabled), s -> { }).get(0).descriptor() == null,
-            "missing module jar is rejected");
-        check(ModuleApprovalDialog.claimedModInfo(mod).contains("PZ mod name: Example Java Mod"),
-            "approval details include declared mod name");
-        check(ModuleApprovalDialog.claimedModInfo(mod).contains("Declared author (not verified): Example Author"),
-            "approval details label mod author as unverified");
-        check(ModuleApprovalDialog.claimedModInfo(disabled).contains("Declared author (not verified): Not provided"),
-            "approval details handle absent author metadata");
-        check(ModuleApprovalDialog.decisionForSelection(0) == TrustStore.Decision.ALLOW_EXACT,
-            "allow choice persists exact-hash approval");
-        check(ModuleApprovalDialog.decisionForSelection(1) == TrustStore.Decision.DENY_EXACT,
-            "deny choice persists exact-hash denial");
-        check(ModuleApprovalDialog.decisionForSelection(2) == TrustStore.Decision.APPROVAL_REQUIRED,
-            "skip choice leaves module blocked");
-        TrustStore uiTrust = new TrustStore(temp.resolve("ui-trust.properties"));
-        ModuleApprovalDialog.persistDecision(uiTrust, hash, ModuleApprovalDialog.decisionForSelection(0));
-        check(uiTrust.check(hash) == TrustStore.Decision.ALLOW_EXACT,
-            "startup allow choice persists before module loading");
-        check(uiTrust.check("1".repeat(64)) == TrustStore.Decision.APPROVAL_REQUIRED,
-            "startup approval does not trust a changed jar hash");
-        ModuleApprovalDialog.persistDecision(uiTrust, "2".repeat(64), ModuleApprovalDialog.decisionForSelection(1));
-        check(uiTrust.check("2".repeat(64)) == TrustStore.Decision.DENY_EXACT,
-            "startup deny choice persists for the exact jar hash");
-        ModuleApprovalDialog.persistDecision(uiTrust, "3".repeat(64), ModuleApprovalDialog.decisionForSelection(2));
-        check(uiTrust.check("3".repeat(64)) == TrustStore.Decision.APPROVAL_REQUIRED,
-            "startup skip choice persists no trust decision");
-        check(ModuleDiscovery.inspectEnabledRoots(List.of(mod, duplicate), s -> { }).stream().allMatch(c -> c.problem() != null),
+        ModuleDiscovery.Candidate moduleCandidate = candidates.stream().filter(c -> c.descriptor() != null).findFirst().orElseThrow();
+        String hash = Hashing.sha256(moduleCandidate.descriptor().jar());
+        check(candidates.size() == 2 && moduleCandidate.problem() == null, "enabled module and companion JAR discovery");
+        check(candidates.stream().anyMatch(c -> helperJar.equals(c.jar()) && c.descriptor() == null
+                && c.problem().contains("not the entry point")), "non-entrypoint JAR is shown but not loadable");
+        check(ModuleDiscovery.inspectEnabledRoots(List.of(disabled), s -> { }).isEmpty(),
+            "mod without a JAR has no review entry");
+        Path plainMod = Files.createDirectories(temp.resolve("enabled-plain-mod"));
+        Path plainJar = plainMod.resolve("legacy-java-mod.jar");
+        Files.copy(moduleJar, plainJar);
+        List<ModuleDiscovery.Candidate> plainCandidates = ModuleDiscovery.inspectEnabledRoots(List.of(plainMod), s -> { });
+        check(plainCandidates.size() == 1 && plainCandidates.get(0).descriptor() == null
+                && plainCandidates.get(0).jar().equals(plainJar.toAbsolutePath())
+                && plainCandidates.get(0).problem().contains("author must add"),
+            "all enabled mod JARs are visible but unsupported Java is never loaded generically");
+        check(ModuleReviewFiles.entry(moduleCandidate, hash, "BLOCKED BY DEFAULT").author().equals("Example Author"),
+            "review list displays author claim from mod.info");
+        Path manifest = temp.resolve("Lua/KnoxBridge/module-review.txt");
+        ModuleReviewFiles.writeManifest(manifest, List.of(
+            new ModuleReviewFiles.Entry("org.example.knoxbridge.greeting", "1.0", hash,
+                "Example\tJava Mod", "Example Author", "BLOCKED BY DEFAULT", "example.jar")));
+        List<String> manifestLines = Files.readAllLines(manifest);
+        check(manifestLines.get(0).equals(ModuleReviewFiles.MANIFEST_HEADER)
+                && manifestLines.get(1).split("\\t", -1).length == 7
+                && !manifestLines.get(1).contains("Example\tJava"),
+            "review manifest is versioned and metadata cannot inject fields");
+        Path trustQueueStorePath = temp.resolve("review-queue-trust.properties");
+        TrustStore reviewTrust = new TrustStore(trustQueueStorePath);
+        check(reviewTrust.check(hash) == TrustStore.Decision.APPROVAL_REQUIRED, "unknown module defaults blocked");
+        Path queue = temp.resolve("Lua/KnoxBridge/module-decisions.txt");
+        Files.createDirectories(queue.getParent());
+        Files.writeString(queue, ModuleReviewFiles.DECISIONS_HEADER + "\n" + hash + "\tallow\n"
+                + ModuleReviewFiles.DECISIONS_COMMIT + "\n");
+        ModuleReviewFiles.applyQueuedDecisions(reviewTrust, queue, s -> { });
+        check(reviewTrust.check(hash) == TrustStore.Decision.ALLOW_EXACT && !Files.exists(queue),
+            "in-game approval persists exact-hash allow for the next startup");
+        String changedReviewHash = "1".repeat(64);
+        check(reviewTrust.check(changedReviewHash) == TrustStore.Decision.APPROVAL_REQUIRED,
+            "changed JAR remains blocked after another exact hash is allowed");
+        Files.writeString(queue, ModuleReviewFiles.DECISIONS_HEADER + "\ninvalid\tallow\n"
+                + ModuleReviewFiles.DECISIONS_COMMIT + "\n");
+        ModuleReviewFiles.applyQueuedDecisions(reviewTrust, queue, s -> { });
+        check(reviewTrust.check("2".repeat(64)) == TrustStore.Decision.APPROVAL_REQUIRED,
+            "malformed in-game decision queue fails closed");
+        check(ModuleDiscovery.inspectEnabledRoots(List.of(mod, duplicate), s -> { }).stream()
+                .filter(c -> c.descriptor() != null).allMatch(c -> c.problem() != null),
             "duplicate module IDs both rejected");
         check(Hashing.sha256(candidates.get(0).descriptor().jar()).length() == 64, "SHA-256 identity");
 
@@ -135,11 +154,17 @@ public final class RuntimeVerifier {
         Files.writeString(selectedMod.resolve("knoxbridge.properties"), "fixture");
         FakeFileSystem fakeFs = new FakeFileSystem(temp.resolve("pz-mod").toString());
         check(PzModDiscovery.resolve(fakeFs, List.of("enabled", "disabled"), s -> { }).equals(List.of(selectedMod.toAbsolutePath())),
-            "PZ resolver inspects only active mod IDs and selected version directory");
-        check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-agentlib:zbNative")), "native ZombieBuddy runtime conflict detected");
-        check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-javaagent:ZombieBuddy.jar")), "other Java agent conflict detected");
+            "PZ resolver returns only active mod IDs and selected version directory");
+        Path plainRoot = Files.createDirectories(temp.resolve("plain-root"));
+        Files.createDirectories(plainRoot.resolve("42.21"));
+        FakeFileSystem plainFs = new FakeFileSystem(plainRoot.toString());
+        check(PzModDiscovery.resolve(plainFs, List.of("enabled"), s -> { })
+                .equals(List.of(plainRoot.resolve("42.21").toAbsolutePath())),
+            "enabled mod roots are surfaced for safe JAR inventory even without a Bridge descriptor");
+        check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-agentlib:exampleRuntime")), "native instrumentation conflict detected");
+        check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-javaagent:another-runtime.jar")), "competing Java agent conflict detected");
         check(!KnoxBridgeAgent.hasCompetingBootstrap(List.of("-javaagent:C:/game/.knoxbridge/knoxbridge-agent.jar")), "KnoxBridge agent not treated as foreign");
-        System.out.println("KnoxBridge offline verification PASS checks=39");
+        System.out.println("KnoxBridge offline verification PASS checks=46");
     }
 
     private static void check(boolean ok, String name) { if (!ok) throw new AssertionError(name); }
