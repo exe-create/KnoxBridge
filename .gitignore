@@ -6,6 +6,9 @@
 *.iml
 .idea/
 .vscode/
+.modforge/
+.codex/
+.opencode/
 
 # Local machine configuration and credentials
 .env
