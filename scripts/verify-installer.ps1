@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'trust-decisions.ps1')
 $temp = Join-Path ([IO.Path]::GetTempPath()) ("knoxbridge-installer-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $temp | Out-Null
 try {
@@ -30,5 +31,14 @@ try {
     try { & (Join-Path $PSScriptRoot 'install.ps1') -GameDirectory $conflictGame -AgentJarPath $dummyAgent -BootstrapDllPath $dummyBootstrap | Out-Null }
     catch { $blocked = $true }
     if (!$blocked -or (Get-Content (Join-Path $conflictGame 'ProjectZomboid64.json') -Raw) -ne $conflictJson) { throw 'Installer did not fail safely on a competing bootstrap.' }
-    Write-Output 'KnoxBridge installer verification PASS checks=9'
+    $trustFile = Join-Path $temp 'trust\trust.properties'
+    $hashA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    $hashB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    Set-KnoxBridgeTrustDecision -TrustFile $trustFile -Hash $hashA -Decision allow
+    Set-KnoxBridgeTrustDecision -TrustFile $trustFile -Hash $hashB -Decision deny
+    Set-KnoxBridgeTrustDecision -TrustFile $trustFile -Hash $hashA -Decision deny
+    $trust = @(Get-Content -LiteralPath $trustFile)
+    if (@($trust | Where-Object { $_.Trim() -ceq "$hashA=deny" }).Count -ne 1 -or @($trust | Where-Object { $_.Trim() -ceq "$hashA=allow" }).Count -ne 0) { throw 'Trust decision update did not replace the exact-hash decision.' }
+    if (@($trust | Where-Object { $_.Trim() -ceq "$hashB=deny" }).Count -ne 1) { throw 'A separate module deny decision was lost.' }
+    Write-Output 'KnoxBridge installer verification PASS checks=13'
 } finally { Remove-Item -LiteralPath $temp -Recurse -Force }

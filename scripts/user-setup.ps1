@@ -5,6 +5,7 @@ $bootstrap = Join-Path $package 'bootstrap-windows\knoxbridge-bootstrap.dll'
 $exampleSource = Join-Path $package 'example-mod\KnoxBridgeIndependentTest'
 $logPath = Join-Path $env:USERPROFILE 'Zomboid\KnoxBridge\knoxbridge.log'
 $trustPath = Join-Path $env:USERPROFILE 'Zomboid\KnoxBridge\trust.properties'
+. (Join-Path $PSScriptRoot 'trust-decisions.ps1')
 
 function Find-GameFolder {
     $candidates = @(
@@ -50,30 +51,40 @@ function Install-KnoxBridge {
     Write-Host ''
     Write-Host 'KnoxBridge is installed. No Steam Launch Options are needed; start Project Zomboid normally with Steam Play.'
     Write-Host 'For Knox Survivors, enable Knox Survivors in the PZ Mods menu; KnoxBridge Runtime is its required Workshop dependency.'
-    Write-Host 'The first launch records the Knox module hash and asks for approval without loading it. Close the game, return here, choose “Approve a module”, approve the displayed hash, and relaunch.'
+    Write-Host 'The first launch records an unknown module hash and blocks it. Close the game, return here, choose “Manage module trust”, then ALLOW or DENY the exact hash (or skip) and relaunch.'
     if (Test-Path -LiteralPath $exampleSource) { Write-Host 'For independent runtime testing, enable the optional KnoxBridge Independent Test Module in the PZ Mods menu.' }
 }
 
 function Approve-LoggedModules {
     if (!(Test-Path -LiteralPath $logPath)) { throw "No KnoxBridge log found at $logPath. Install and launch the game once with the test mod enabled." }
-    $lines = Get-Content -LiteralPath $logPath
+    $lines = @(Get-Content -LiteralPath $logPath)
+    $runStart = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match 'KnoxBridge runtime start PASS') { $runStart = $i }
+    }
+    if ($runStart -lt 0) { Write-Host 'No game-launch session was found in the KnoxBridge log.'; return }
+    $lines = @($lines | Select-Object -Skip $runStart)
     $found = @{}
     foreach ($line in $lines) {
         if ($line -match 'module discovered id=(\S+) source=(.*?) hash=([0-9a-f]{64})') {
             $id = $Matches[1]; $hash = $Matches[3]
-            if ($lines | Where-Object { $_ -match "module approval required id=$([regex]::Escape($id)) decision=APPROVAL_REQUIRED" }) { $found[$hash] = $id }
+            $found[$hash] = $id
         }
     }
-    if ($found.Count -eq 0) { Write-Host 'No modules waiting for approval were found in the log.'; return }
+    if ($found.Count -eq 0) { Write-Host 'No Java modules were discovered during the last game launch.'; return }
     foreach ($hash in $found.Keys) {
         Write-Host "Module: $($found[$hash])"
         Write-Host "SHA-256: $hash"
-        $answer = Read-Host 'Type ALLOW to trust this exact file, or press Enter to skip'
-        if ($answer -ceq 'ALLOW') {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $trustPath) | Out-Null
-            Add-Content -LiteralPath $trustPath -Value "`n# Approved by KnoxBridge Setup $(Get-Date -Format o)`n$hash=allow" -Encoding ASCII
-            Write-Host 'Approved. Restart the game to load this module.'
-        } else { Write-Host 'Skipped.' }
+        if (Test-Path -LiteralPath $trustPath) {
+            $current = Select-String -LiteralPath $trustPath -Pattern "^$([regex]::Escape($hash))=(allow|deny)$" | Select-Object -Last 1
+            if ($current) { Write-Host "Current saved decision: $($current.Matches[0].Groups[1].Value)" }
+        }
+        $answer = Read-Host 'Type ALLOW to trust, DENY to block this exact file, or press Enter to skip'
+        if ($answer -ceq 'ALLOW' -or $answer -ceq 'DENY') {
+            $decision = $answer.ToLowerInvariant()
+            Set-KnoxBridgeTrustDecision -TrustFile $trustPath -Hash $hash -Decision $decision
+            Write-Host "Saved $decision for this exact JAR hash. Restart the game to apply it."
+        } else { Write-Host 'No trust decision changed.' }
     }
 }
 
@@ -92,7 +103,7 @@ while ($true) {
     Clear-Host
     Write-Host 'KnoxBridge Setup'
     Write-Host '1. Install or update KnoxBridge Runtime'
-    Write-Host '2. Approve a module found during the last game launch'
+    Write-Host '2. Manage module trust decisions from the last game launch'
     Write-Host '3. Uninstall KnoxBridge'
     Write-Host '4. Exit'
     $choice = Read-Host 'Choose 1-4'

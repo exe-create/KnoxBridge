@@ -197,28 +197,49 @@ def install():
     print("Close and reopen Steam, then start Project Zomboid normally. No other Java agent may be enabled.")
 
 
+def save_trust_decision(digest, decision):
+    digest = digest.lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise ValueError("A full SHA-256 hash is required")
+    if decision not in ("allow", "deny"):
+        raise ValueError("Trust decision must be allow or deny")
+    TRUST.parent.mkdir(parents=True, exist_ok=True)
+    lines = TRUST.read_text(encoding="ascii").splitlines() if TRUST.is_file() else []
+    lines = [line for line in lines if not re.match(rf"^\s*{digest}\s*=", line)]
+    lines.extend([f"# Updated by KnoxBridge Setup {__import__('datetime').datetime.now().astimezone().isoformat()}",
+                  f"{digest}={decision}"])
+    TRUST.write_text("\n".join(lines) + "\n", encoding="ascii")
+
+
 def approve():
     if not LOG.is_file():
         raise RuntimeError(f"No runtime log found at {LOG}. Install, enable a Java module, and launch once first.")
     lines = LOG.read_text(encoding="utf-8", errors="replace").splitlines()
+    starts = [i for i, line in enumerate(lines) if "KnoxBridge runtime start PASS" in line]
+    if not starts:
+        print("No game-launch session was found in the KnoxBridge log.")
+        return
+    lines = lines[starts[-1]:]
     discovered = {}
-    blocked = set()
     for line in lines:
         m = re.search(r"module discovered id=(\S+) source=.*? hash=([0-9a-f]{64})", line)
         if m: discovered[m.group(2)] = m.group(1)
-        m = re.search(r"module approval required id=(\S+) decision=APPROVAL_REQUIRED", line)
-        if m: blocked.add(m.group(1))
-    pending = [(mod, digest) for digest, mod in discovered.items() if mod in blocked]
-    if not pending:
-        print("No module is waiting for approval in the last runtime log.")
+    modules = [(mod, digest) for digest, mod in discovered.items()]
+    if not modules:
+        print("No Java modules were discovered during the last game launch.")
         return
-    for mod, digest in pending:
+    for mod, digest in modules:
         print(f"Module: {mod}\nSHA-256: {digest}")
-        if input("Type ALLOW to approve this exact JAR, or press Enter to skip: ") == "ALLOW":
-            TRUST.parent.mkdir(parents=True, exist_ok=True)
-            with TRUST.open("a", encoding="ascii") as stream:
-                stream.write(f"\n# Approved by KnoxBridge Setup {__import__('datetime').datetime.now().astimezone().isoformat()}\n{digest}=allow\n")
-            print("Approved. Restart the game to load this exact file.")
+        if TRUST.is_file():
+            saved = [m.group(1) for line in TRUST.read_text(encoding="ascii").splitlines()
+                     if (m := re.match(rf"^\s*{digest}=(allow|deny)$", line))]
+            if saved: print(f"Current saved decision: {saved[-1]}")
+        answer = input("Type ALLOW to trust, DENY to block this exact JAR, or press Enter to skip: ").strip().lower()
+        if answer in ("allow", "deny"):
+            save_trust_decision(digest, answer)
+            print(f"Saved {answer} for this exact JAR hash. Restart the game to apply it.")
+        else:
+            print("No trust decision changed.")
 
 
 def uninstall():
@@ -244,7 +265,7 @@ def menu():
     while True:
         print("\nKnoxBridge Setup")
         print("1. Install or update KnoxBridge Runtime")
-        print("2. Approve a module from the last game launch")
+        print("2. Manage module trust decisions from the last game launch")
         print("3. Uninstall KnoxBridge")
         print("4. Exit")
         choice = input("Choose 1-4: ").strip()

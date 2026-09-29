@@ -58,3 +58,21 @@ with tempfile.TemporaryDirectory(prefix="knoxbridge-vdf-missing-") as temp:
     check("-javaagent:/home/test/agent.jar --" in installed, "Empty launch option must be populated")
 
 print("KnoxBridge Unix setup verification PASS checks=7")
+
+with tempfile.TemporaryDirectory(prefix="knoxbridge-trust-") as temp:
+    setup.TRUST = Path(temp) / "trust.properties"
+    one_hash = "a" * 64
+    other_hash = "b" * 64
+    setup.save_trust_decision(one_hash, "allow")
+    setup.save_trust_decision(other_hash, "deny")
+    setup.save_trust_decision(one_hash, "deny")
+    trust_text = setup.TRUST.read_text(encoding="ascii")
+    check(trust_text.count(one_hash + "=") == 1, "Changing a decision must replace the existing exact-hash entry")
+    check(one_hash + "=deny" in trust_text, "An exact module hash must be blockable")
+    check(other_hash + "=deny" in trust_text, "Separate module denial must be preserved")
+    rejected = False
+    try: setup.save_trust_decision("not-a-hash", "allow")
+    except ValueError: rejected = True
+    check(rejected, "Trust decision must reject malformed hashes")
+
+print("KnoxBridge trust decision verification PASS checks=4")

@@ -18,7 +18,7 @@ try {
     $contents = [IO.Compression.ZipFile]::OpenRead($extracted)
     try {
         $names = @($contents.Entries | ForEach-Object FullName)
-        foreach ($required in @('scripts/user-setup.ps1', 'scripts/install.ps1', 'knoxbridge-agent-0.1.0-alpha3.jar', 'bootstrap-windows/knoxbridge-bootstrap.dll')) {
+        foreach ($required in @('scripts/user-setup.ps1', 'scripts/trust-decisions.ps1', 'scripts/install.ps1', 'knoxbridge-agent-0.1.0-alpha3.jar', 'bootstrap-windows/knoxbridge-bootstrap.dll')) {
             if ($names -notcontains $required) { throw "The embedded archive is missing required file: $required" }
         }
     } finally { $contents.Dispose() }

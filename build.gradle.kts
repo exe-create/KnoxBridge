@@ -112,7 +112,7 @@ tasks.register<Zip>("packageManualInstaller") {
         into("bootstrap-windows")
     }
     from("scripts") {
-        include("user-setup.ps1", "install.ps1", "uninstall.ps1", "verify-installation.ps1", "setup-unix.sh", "setup-unix.py")
+        include("user-setup.ps1", "trust-decisions.ps1", "install.ps1", "uninstall.ps1", "verify-installation.ps1", "setup-unix.sh", "setup-unix.py")
         into("scripts")
     }
     from(files("docs/INSTALLATION.md", "docs/RELEASE_NOTES.md")) { into("docs") }
