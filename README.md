@@ -4,11 +4,11 @@ KnoxBridge is an independently built Java-mod runtime for Project Zomboid. Knox 
 
 ## Install as a player
 
-Subscribe to the KnoxBridge Runtime Workshop dependency and Knox Survivors. Download the separate [manual installer from GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest), extract it, and use its numbered setup menu. Windows uses `KnoxBridge Setup.cmd`; Linux and macOS use `sh scripts/setup-unix.sh` from a terminal with Steam closed. Setup options are **1** install/update, **2** approve a module's exact SHA-256, **3** uninstall, and **4** exit. Then enable Knox Survivors in the PZ Mods menu and start normally through Steam. See [installation details](docs/INSTALLATION.md).
+Subscribe to the KnoxBridge Runtime Workshop dependency and Knox Survivors. Download the setup from [GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest). Windows players run `KnoxBridgeSetup.exe` directly; it contains the full installer and uses PZ's bundled Java, so no separate Java download or archive extraction is needed. Linux/macOS players use the ZIP and run `sh scripts/setup-unix.sh` with Steam closed; that helper currently requires Python 3. Setup options are **1** install/update, **2** approve a module's exact SHA-256, **3** uninstall, and **4** exit. Then enable Knox Survivors in the PZ Mods menu and start normally through Steam. See [installation details](docs/INSTALLATION.md).
 
 Steam Workshop rejects installer binaries and scripts. Its KnoxBridge item therefore contains only the dependency marker and default ModTemplate images; it cannot install the runtime by itself. One-time local setup is required on every operating system.
 
-The Windows runtime path was observed in normal Steam startup on Project Zomboid 42.21.0, including enabled-mod discovery and test/Knox module loading after explicit hash approval. That live run preceded this alpha2 packaging pass; alpha2 has passed offline checks, installer fixtures, and copied-launcher smoke, but has not been rerun through normal Steam. Linux/macOS setup is newly implemented and still needs real installations for live validation. Knox module gameplay and save/reload remain under test. Java modules have full account permissions; approve only code you trust.
+The Windows runtime path was observed in normal Steam startup on Project Zomboid 42.21.0, including enabled-mod discovery and test/Knox module loading after explicit hash approval. The alpha3 standalone installer adds Windows packaging; it still needs to be exercised through the full Steam path. Linux/macOS setup needs real installations for live validation and is not yet a single-file installer. Knox module gameplay and save/reload remain under test. Java modules have full account permissions; approve only code you trust.
 
 ## Build and verify
 
@@ -17,9 +17,10 @@ Requires Java 17 or newer for building. PZ uses its own bundled Java runtime whe
 ```powershell
 ./gradlew verify
 ./gradlew packageManualInstaller
+./gradlew buildWindowsInstaller
 ./gradlew packageRuntime
 ```
 
-The player package is written to `build/distributions/KnoxBridgeRuntime-0.1.0-alpha2.zip`. `packageRuntime` is the developer/test package and includes the independent example fixture. `scripts/stage-workshop.ps1` creates the Steam-safe marker-only Workshop upload folder.
+The Unix/player archive is written to `build/distributions/KnoxBridgeRuntime-0.1.0-alpha3.zip`; the Windows self-contained installer is `bootstrap-windows/build/KnoxBridgeSetup.exe`. `packageRuntime` is the developer/test package and includes the independent example fixture. `scripts/verify-windows-installer.ps1` verifies the EXE's embedded archive. `scripts/stage-workshop.ps1` creates the Steam-safe marker-only Workshop upload folder.
 
 Tracked project sources include the generic Java API/runtime, independent test module, Windows native bootstrap source, Windows and Unix setup tools, verification scripts, and documentation. See [Architecture](docs/ARCHITECTURE.md), [Module API](docs/MODULE_API.md), [Patch API](docs/PATCH_API.md), [Trust and security](docs/SECURITY_AND_TRUST.md), [Compatibility](docs/COMPATIBILITY.md), and [Development testing](docs/DEVELOPMENT_TESTING.md).

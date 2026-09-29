@@ -5,7 +5,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $sourceExe = Join-Path $game 'ProjectZomboid64.exe'
 $sourceJre = Join-Path $game 'jre64'
 if (!(Test-Path -LiteralPath $sourceExe -PathType Leaf) -or !(Test-Path -LiteralPath $sourceJre -PathType Container)) { throw 'PZ Windows launcher or bundled JRE is missing.' }
-$agent = Join-Path $root 'runtime-core\build\libs\knoxbridge-agent-0.1.0-alpha2.jar'
+$agent = Join-Path $root 'runtime-core\build\libs\knoxbridge-agent-0.1.0-alpha3.jar'
 $native = Join-Path $root 'bootstrap-windows\build\knoxbridge-bootstrap.dll'
 $smokeJar = Join-Path $root 'bootstrap-smoke\build\libs\bootstrap-smoke.jar'
 if (!(Test-Path -LiteralPath $agent) -or !(Test-Path -LiteralPath $native) -or !(Test-Path -LiteralPath $smokeJar)) { throw 'Build artifacts are missing; run gradlew verify first.' }

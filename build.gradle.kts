@@ -2,7 +2,7 @@ plugins { base }
 
 allprojects {
     group = "com.knoxbridge"
-    version = "0.1.0-alpha2"
+    version = "0.1.0-alpha3"
     repositories { mavenCentral() }
 }
 
@@ -118,4 +118,23 @@ tasks.register<Zip>("packageManualInstaller") {
     from(files("docs/INSTALLATION.md", "docs/RELEASE_NOTES.md")) { into("docs") }
     from("THIRD_PARTY_NOTICES.md")
     from("README.md")
+}
+
+tasks.register<Exec>("buildWindowsInstaller") {
+    group = "distribution"
+    description = "Builds the self-contained Windows setup executable with the player package embedded."
+    dependsOn("packageManualInstaller")
+    inputs.file(layout.projectDirectory.file("bootstrap-windows/src/knoxbridge_setup.cpp"))
+    inputs.file(layout.projectDirectory.file("scripts/build-windows-installer.ps1"))
+    outputs.file(layout.projectDirectory.file("bootstrap-windows/build/KnoxBridgeSetup.exe"))
+    doFirst {
+        if (!System.getProperty("os.name").lowercase().contains("windows")) {
+            throw GradleException("The standalone Windows installer must be built with the Windows x64 toolchain.")
+        }
+    }
+    commandLine(
+        "powershell", "-ExecutionPolicy", "Bypass", "-File",
+        file("scripts/build-windows-installer.ps1").absolutePath,
+        "-PackageZip", layout.buildDirectory.file("distributions/KnoxBridgeRuntime-${project.version}.zip").get().asFile.absolutePath
+    )
 }
