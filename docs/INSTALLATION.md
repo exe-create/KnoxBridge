@@ -1,6 +1,6 @@
 # Player setup
 
-**Release note:** The full-screen startup review gate and optional remember choices are in the alpha8 source candidate. They require the matching KnoxBridge runtime package and Workshop payload. Knox Survivors does not need a runtime code update for this feature.
+**Release note:** The full-screen startup review gate and optional remember choices are in the alpha9 source candidate. They require the matching KnoxBridge runtime package and Workshop payload. Knox Survivors does not need a runtime code update for this feature.
 
 KnoxBridge has a Steam Workshop dependency marker and a separate player setup download. The Workshop item carries PZ metadata, the compile-time API JAR, and concise player/mod-author guides; it does not install or activate the runtime. Download player setup from [KnoxBridge GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest). The separate Knox Survivors Launcher is deprecated and unsupported. Do not download or use its old releases, or combine it or a direct legacy Knox agent with KnoxBridge.
 
@@ -40,7 +40,7 @@ Run `scripts/stage-workshop.ps1` on Windows to prepare the KnoxBridge Workshop i
 
 ## Acceptance boundaries
 
-- **Offline verified:** alpha8 runtime inventory and once/remember decision checks, Windows native-installer fixtures, archive integrity, Bridge Workshop Lua checks, and Unix config helper tests. This does not establish Build 42 UI behavior or antivirus clearance for any EXE.
+- **Offline verified:** alpha9 runtime inventory and once/remember decision checks, Windows native-installer fixtures, archive integrity, Bridge Workshop Lua checks, and Unix config helper tests. This does not establish Build 42 UI behavior or antivirus clearance for any EXE.
 - **Wrapper smoke verified:** Windows native bootstrap against the copied launcher fixture.
 - **Real PZ 42.21 verified on the prior runtime build:** Windows normal Steam startup, enabled-mod discovery, unknown-hash block, approved module load, and restore/uninstall/reinstall. The new Bridge Workshop menu, enabled-JAR inventory, next-launch allow/deny queue, updated Windows package, and normal no-installer trust flow still need fresh Build 42 replay.
 - **Unix setup implemented, not live verified:** Linux/macOS Steam config editing and direct Java-agent launch path.

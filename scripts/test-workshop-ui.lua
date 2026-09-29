@@ -74,6 +74,17 @@ assert(review.pendingRestartRequired({ compatible, loadedModule }, pendingUndo),
 pendingUndo[loadedModule.hash] = nil
 assert(not review.pendingRestartRequired({ compatible, loadedModule }, pendingUndo), "undoing all load-set changes should clear restart requirement")
 assert(not review.hasPendingChoice(pendingUndo, unsupported), "unsupported JAR without a queued choice should not expose undo")
+local selectionPanel = { showCount = 0 }
+function selectionPanel:showSelection() self.showCount = self.showCount + 1 end
+local selectionList = {}
+function selectionList:setOnMouseDownFunction(target, callback)
+    self.target = target
+    self.onmousedown = callback
+end
+review.bindSelectionHandler(selectionList, selectionPanel)
+selectionList.onmousedown(selectionList.target, compatible)
+assert(selectionPanel.selectedModule == compatible and selectionPanel.showCount == 1,
+    "native list click callback must receive the panel target and selected module")
 
 for _, size in ipairs({ { 800, 600 }, { 1920, 1080 }, { 640, 480 } }) do
     local bounds = review.layout(size[1], size[2])
@@ -84,4 +95,4 @@ local gate = review.layout(1920, 1080, true)
 assert(gate.x == 12 and gate.y == 12 and gate.width == 1896 and gate.height == 1056,
     "startup review gate must cover the main menu")
 
-print("KnoxBridge Workshop UI offline checks PASS checks=30")
+print("KnoxBridge Workshop UI offline checks PASS checks=31")

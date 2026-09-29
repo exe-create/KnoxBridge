@@ -145,6 +145,13 @@ function Review.pendingRestartRequired(modules, pending)
     return false
 end
 
+function Review.bindSelectionHandler(list, panel)
+    list:setOnMouseDownFunction(panel, function(target, module)
+        target.selectedModule = module
+        target:showSelection()
+    end)
+end
+
 function Panel:new(x, y, width, height, modules, manifestError)
     local object = ISPanel:new(x, y, width, height)
     setmetatable(object, self)
@@ -176,7 +183,7 @@ function Panel:createChildren()
     self:addChild(help)
 
     local listWidth = math.floor(self.width * 0.54)
-    self.moduleList = ISScrollingListBox:new(margin, 72, listWidth, self.height - 154, self)
+    self.moduleList = ISScrollingListBox:new(margin, 72, listWidth, self.height - 154)
     self.moduleList:initialise()
     self.moduleList.itemheight = 52
     self.moduleList.drawBorder = true
@@ -228,10 +235,7 @@ function Panel:createChildren()
     self.statusLabel:initialise()
     self:addChild(self.statusLabel)
 
-    self.moduleList.onmousedown = function(target, module)
-        target.selectedModule = module
-        target:showSelection()
-    end
+    Review.bindSelectionHandler(self.moduleList, self)
     self:refreshList()
     self:showSelection()
 end

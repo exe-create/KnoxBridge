@@ -62,3 +62,9 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Require one quit/relaunch only when a choice changes which Java modules are loaded. An unchanged allow or an already blocked file does not require a restart.
 - Keep accepting the version-1 queued decision format and add version-2 once/remember choices.
 - Offline validation is recorded separately from live Build 42 visibility, gate, persistence, and restart acceptance.
+
+# KnoxBridge Runtime 0.1.0-alpha9 source candidate
+- Fix the main-menu JAR selection callback by registering it with Project Zomboid's `ISScrollingListBox:setOnMouseDownFunction` API.
+- Alpha8 live logs showed the runtime and Knox Survivors module initialized on Project Zomboid 42.21, but selecting a listed JAR raised `attempted index of non-table` in the review callback. The UI click failure was isolated to the callback target binding.
+- Extend the Workshop UI regression checks to exercise the native callback target and selection behavior.
+- Build 42 live verification of the corrected review screen remains required.

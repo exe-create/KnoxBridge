@@ -2,7 +2,7 @@ plugins { base }
 
 allprojects {
     group = "com.knoxbridge"
-    version = "0.1.0-alpha8"
+    version = "0.1.0-alpha9"
     repositories { mavenCentral() }
 }
 
