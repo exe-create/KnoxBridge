@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $package = Split-Path -Parent $PSScriptRoot
-$agent = Join-Path $package 'knoxbridge-agent-0.1.0-alpha1.jar'
+$agent = Join-Path $package 'knoxbridge-agent-0.1.0-alpha2.jar'
 $bootstrap = Join-Path $package 'bootstrap-windows\knoxbridge-bootstrap.dll'
 $exampleSource = Join-Path $package 'example-mod\KnoxBridgeIndependentTest'
 $logPath = Join-Path $env:USERPROFILE 'Zomboid\KnoxBridge\knoxbridge.log'
@@ -24,27 +24,34 @@ function Find-GameFolder {
 }
 
 function Install-KnoxBridge {
-    if (!(Test-Path -LiteralPath $agent) -or !(Test-Path -LiteralPath $bootstrap) -or !(Test-Path -LiteralPath $exampleSource)) {
+    if (!(Test-Path -LiteralPath $agent) -or !(Test-Path -LiteralPath $bootstrap)) {
         throw 'The setup files are incomplete. Extract the entire KnoxBridge download before running setup.'
     }
     $game = Find-GameFolder
     if (!$game) { return }
     & (Join-Path $PSScriptRoot 'install.ps1') -GameDirectory $game -AgentJarPath $agent -BootstrapDllPath $bootstrap
     & (Join-Path $PSScriptRoot 'verify-installation.ps1') -GameDirectory $game
-    $mods = Join-Path $env:USERPROFILE 'Zomboid\mods'
-    $example = Join-Path $mods 'KnoxBridgeIndependentTest'
-    if (Test-Path -LiteralPath $example) {
-        $descriptor = Join-Path $example '42\knoxbridge.properties'
-        if (!(Test-Path -LiteralPath $descriptor) -or !(Select-String -LiteralPath $descriptor -SimpleMatch 'id=org.example.knoxbridge.greeting' -Quiet)) {
-            throw "A different mod already uses $example. Runtime is installed; move that folder before installing the test module."
+    if (Test-Path -LiteralPath $exampleSource) {
+        $installExample = (Read-Host 'Also install the optional KnoxBridge independent test mod? (y/N)') -eq 'y'
+        if ($installExample) {
+            $mods = Join-Path $env:USERPROFILE 'Zomboid\mods'
+            $example = Join-Path $mods 'KnoxBridgeIndependentTest'
+            if (Test-Path -LiteralPath $example) {
+                $descriptor = Join-Path $example '42\knoxbridge.properties'
+                if (!(Test-Path -LiteralPath $descriptor) -or !(Select-String -LiteralPath $descriptor -SimpleMatch 'id=org.example.knoxbridge.greeting' -Quiet)) {
+                    throw "A different mod already uses $example. Runtime is installed; move that folder before installing the test module."
+                }
+            } else {
+                New-Item -ItemType Directory -Force -Path $mods | Out-Null
+                Copy-Item -LiteralPath $exampleSource -Destination $example -Recurse
+            }
         }
-    } else {
-        New-Item -ItemType Directory -Force -Path $mods | Out-Null
-        Copy-Item -LiteralPath $exampleSource -Destination $example -Recurse
     }
     Write-Host ''
-    Write-Host 'KnoxBridge is installed. In the PZ Mods menu, enable “KnoxBridge Independent Test Module”, then start a game.'
-    Write-Host 'The first launch records its module hash and asks for approval without loading it. Close the game, return here, choose “Approve a module”, approve the displayed hash, and relaunch.'
+    Write-Host 'KnoxBridge is installed. No Steam Launch Options are needed; start Project Zomboid normally with Steam Play.'
+    Write-Host 'For Knox Survivors, enable Knox Survivors in the PZ Mods menu; KnoxBridge Runtime is its required Workshop dependency.'
+    Write-Host 'The first launch records the Knox module hash and asks for approval without loading it. Close the game, return here, choose “Approve a module”, approve the displayed hash, and relaunch.'
+    if (Test-Path -LiteralPath $exampleSource) { Write-Host 'For independent runtime testing, enable the optional KnoxBridge Independent Test Module in the PZ Mods menu.' }
 }
 
 function Approve-LoggedModules {
@@ -84,7 +91,7 @@ function Remove-KnoxBridge {
 while ($true) {
     Clear-Host
     Write-Host 'KnoxBridge Setup'
-    Write-Host '1. Install or update KnoxBridge and its test module'
+    Write-Host '1. Install or update KnoxBridge Runtime'
     Write-Host '2. Approve a module found during the last game launch'
     Write-Host '3. Uninstall KnoxBridge'
     Write-Host '4. Exit'

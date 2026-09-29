@@ -14,7 +14,7 @@ import java.lang.management.ManagementFactory;
 /** Early JVM bootstrap and PZ-specific adapter owner. */
 public final class KnoxBridgeAgent {
     private static final String VERSION = KnoxBridgeAgent.class.getPackage().getImplementationVersion() == null
-        ? "0.1.0-alpha1" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
+        ? "0.1.0-alpha2" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
     private static final AtomicBoolean STARTED = new AtomicBoolean();
     private static final AtomicBoolean MODULES_STARTED = new AtomicBoolean();
     private static final List<ModuleLoader.LoadedModule> LOADED = new CopyOnWriteArrayList<>();
@@ -122,7 +122,7 @@ public final class KnoxBridgeAgent {
                     log.write("module approval required id=" + d.id() + " decision=" + decision);
                     continue;
                 }
-                LOADED.add(ModuleLoader.load(d, d.jar(), VERSION, patchEngine, log::write));
+                LOADED.add(ModuleLoader.load(d, d.jar(), VERSION, patchEngine, instrumentation, log::write));
             } catch (Throwable failure) { log.write("module failed id=" + d.id() + " reason=" + failure); }
         }
         retransformRegisteredTargets();

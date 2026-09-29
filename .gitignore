@@ -1,4 +1,23 @@
+# Gradle output and local caches
 .gradle/
 **/build/
+
+# IDE files
 *.iml
 .idea/
+.vscode/
+
+# Local machine configuration and credentials
+.env
+.env.*
+!.env.example
+local.properties
+*.p12
+*.pfx
+*.keystore
+*.jks
+
+# Local runtime/install state
+.knoxbridge/
+__pycache__/
+*.py[cod]

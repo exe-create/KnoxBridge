@@ -5,7 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 
-record ModuleDescriptor(String id, String version, String apiVersion, String entrypoint, Path jar) {
+record ModuleDescriptor(String id, String version, String apiVersion, String entrypoint, String classLoader, Path jar) {
     static ModuleDescriptor read(Path modRoot) throws IOException {
         Path descriptor = modRoot.resolve("knoxbridge.properties").normalize();
         if (!descriptor.startsWith(modRoot.normalize()) || !Files.isRegularFile(descriptor))
@@ -16,6 +16,9 @@ record ModuleDescriptor(String id, String version, String apiVersion, String ent
         String version = required(p, "version");
         String api = required(p, "apiVersion");
         String entry = required(p, "entrypoint");
+        String classLoader = p.getProperty("classLoader", "isolated").trim();
+        if (!classLoader.equals("isolated") && !classLoader.equals("system"))
+            throw new IOException("classLoader must be isolated or system");
         String jarValue = required(p, "jar");
         Path relativeJar = Path.of(jarValue);
         if (relativeJar.isAbsolute()) throw new IOException("jar path must be relative to mod root");
@@ -25,7 +28,7 @@ record ModuleDescriptor(String id, String version, String apiVersion, String ent
         Path realRoot = modRoot.toRealPath();
         if (!jar.toRealPath().startsWith(realRoot)) throw new IOException("jar symlink escapes mod root");
         if (id.contains(" ") || id.contains("/") || id.contains("\\")) throw new IOException("invalid module id");
-        return new ModuleDescriptor(id, version, api, entry, jar);
+        return new ModuleDescriptor(id, version, api, entry, classLoader, jar);
     }
 
     private static String required(Properties p, String key) throws IOException {

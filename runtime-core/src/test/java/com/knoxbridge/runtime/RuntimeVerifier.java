@@ -51,7 +51,7 @@ public final class RuntimeVerifier {
         List<String> moduleLog = new ArrayList<>();
         PatchEngine modulePatches = new PatchEngine(moduleLog::add);
         try (ModuleLoader.LoadedModule loaded = ModuleLoader.load(candidates.get(0).descriptor(),
-                candidates.get(0).descriptor().jar(), "test-runtime", modulePatches, moduleLog::add)) {
+                candidates.get(0).descriptor().jar(), "test-runtime", modulePatches, null, moduleLog::add)) {
             check(moduleLog.stream().anyMatch(s -> s.contains("independent example module ready")), "independent module entrypoint");
             check(moduleLog.stream().anyMatch(s -> s.contains("patch registered module=org.example.knoxbridge.greeting")), "module patch API registration");
         }

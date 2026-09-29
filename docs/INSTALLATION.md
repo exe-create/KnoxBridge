@@ -1,17 +1,44 @@
-# Windows installation
+# Player setup
 
-For a player-style install, extract the complete release ZIP and double-click `KnoxBridge Setup.cmd`. Choose **Install**; setup finds a standard Steam install or opens a folder picker, adds the runtime, and copies the independent test module into `%USERPROFILE%\Zomboid\mods`.
+KnoxBridge has a small Steam Workshop dependency marker and a separate manual setup download. Steam rejects executable and installer file types in Workshop uploads, so the Workshop item contains only the PZ metadata and default ModTemplate images. The player installer is distributed from [KnoxBridge GitHub Releases](https://github.com/exe-create/KnoxBridgeRuntime/releases/latest).
 
-In Project Zomboid's Mods menu, enable **KnoxBridge Independent Test Module** and start a game. The first launch records the module's exact SHA-256 and refuses to load it until approved. Exit the game, reopen the setup menu, choose **Approve a module**, check the displayed module ID and hash, and type `ALLOW` to approve that exact file. Restart the game. Check `%USERPROFILE%\Zomboid\KnoxBridge\knoxbridge.log` for the module load result.
+## Windows
 
-Choose **Uninstall** in the same setup menu to restore the original startup configuration and remove KnoxBridge's runtime files. It asks separately before removing the bundled test module. If you changed game launch settings after installing, uninstall preserves those edits while removing only KnoxBridge's arguments.
+1. Subscribe to KnoxBridge Runtime and Knox Survivors, and wait for Steam downloads to finish.
+2. Download and extract the latest `KnoxBridgeRuntime-*.zip` from GitHub Releases.
+3. Run `KnoxBridge Setup.cmd`, choose **1**, and select the Project Zomboid game folder if setup does not find it.
+4. Enable Knox Survivors in the PZ Mods menu and start a disposable save through Steam.
+5. The first run blocks an unknown module hash. Close PZ, reopen setup, choose **2**, verify the module ID and SHA-256, type `ALLOW`, then restart through Steam.
 
-The setup modifies `ProjectZomboid64.json`, not Steam's launch-options database. It has now been exercised against the installed game and a normal Steam launch reached PZ 42.21.0; the test module and uninstall remain unverified live. The command-line install, verify, and uninstall scripts remain available for advanced use.
+The installer owns and backs up only the PZ startup JSON and its own runtime files. It detects competing Java instrumentation and refuses to stack runtimes. Uninstall with menu option **3**. If the startup config is unchanged, it restores the original bytes; if it has later user edits, it removes only KnoxBridge's arguments and preserves those edits.
 
-## Current installed 42.21 acceptance
+## Linux and macOS
 
-On 2026-09-28 the installer was run against the installed game. `verify-installation.ps1` passed; the backed-up JSON hash exactly matched the pre-install hash, and the installed agent and native bootstrap matched their built artifact hashes. The existing historical `.bat.knox-bak` was not changed. A normal Steam AppID launch then logged KnoxBridge startup, Java 25.0.1, PZ 42.21.0, successful `loadMods(List)` transform application, and `runtime ready modules=0`. No active mods were present in that launch context. Test-module approval, module loading, and uninstall/restore acceptance are still pending.
+The release includes a Unix setup helper. It uses Python 3 from the standard library and modifies only Project Zomboid's `LaunchOptions` entry in your Steam `localconfig.vdf`.
 
-The installer backs up the exact original JSON, adds the native preloader argument before the Java agent, writes an ownership record and copies both runtime artifacts under `.knoxbridge`. It refuses an unmanaged Java/native agent or ZombieBuddy configuration in the game JSON or batch launcher. At runtime, KnoxBridge also checks active JVM arguments so a ZombieBuddy Steam launch option is detected. Repeated install updates the owned files. If the JSON is unchanged since install, uninstall restores its original bytes; if user edits are detected, uninstall removes only the two owned arguments and preserves those edits. Trust data and logs remain in the user-writable Zomboid directory.
+1. Subscribe to KnoxBridge Runtime and Knox Survivors, and wait for Steam downloads to finish.
+2. Download and extract `KnoxBridgeRuntime-*.zip` from GitHub Releases.
+3. Close Steam, open a terminal in the extracted folder, and run `sh scripts/setup-unix.sh`.
+4. Choose **1** to install/update. If setup asks for a `localconfig.vdf` path, select the one under your Steam `userdata/<account>/config/` directory.
+5. Reopen Steam, enable Knox Survivors in the PZ Mods menu, and start a disposable save normally.
+6. For the first blocked module, close PZ, close Steam, run the setup helper again and choose **2**. Verify its ID and SHA-256 and type `ALLOW`; restart PZ.
 
-This changes `ProjectZomboid64.json`, not Steam's launch-options database. Whether the installed normal Steam route consumes this JSON as expected must be checked live. The current local installation has pre-existing Knox backup state; this project did not modify it.
+The helper backs up the exact Steam config before its first edit, records the installed hash, preserves other launch options, and removes only its own option if Steam settings change later. Choose **3** to uninstall. Do not run the helper while Steam is open; Steam can overwrite its local config while running.
+
+The Linux/macOS installer and Steam VDF editing are implemented but have **not** been live-tested on those operating systems. The proven live path remains Windows x64 on PZ 42.21.0. Linux/macOS players should keep a copy of their Steam config and report setup/startup failures before relying on this alpha with important saves.
+
+## Trust and safety
+
+Unknown or changed Java module JARs are not loaded until explicitly approved by exact SHA-256. Java modules run with the same permissions as Project Zomboid and are not sandboxed. Approve only code you trust. The independent test module is a developer fixture and is not installed by the player setup.
+
+## Workshop publishing
+
+Run `scripts/stage-workshop.ps1` on Windows to prepare the KnoxBridge dependency marker under `%USERPROFILE%\Zomboid\Workshop\KnoxBridgeRuntime`. If that stage exists, the script first moves it to `%USERPROFILE%\Zomboid\WorkshopBackups` so the previous installer payload is preserved outside the upload folder. It then emits exactly four files under `Contents/mods/KnoxBridgeRuntime`: `mod.info`, `poster.png`, `42/mod.info`, and `42/poster.png`. It copies the default ModTemplate images without modification and checks the payload against Steam's forbidden extensions. The Workshop item points players to the GitHub release for setup. Keep it private until its release visibility and Knox Survivors' Required Items link are ready.
+
+## Acceptance boundaries
+
+- **Offline verified:** runtime, exact-hash trust, and installer test suites.
+- **Wrapper smoke verified:** Windows native bootstrap against the copied launcher fixture.
+- **Real PZ 42.21 verified on the prior runtime build:** Windows normal Steam startup, enabled-mod discovery, unknown-hash block, approved module load, and restore/uninstall/reinstall. Alpha2 itself has wrapper smoke and installer fixture checks, but was not rerun through the full game.
+- **Unix setup implemented, not live verified:** Linux/macOS Steam config editing and direct Java-agent launch path.
+- **Knox module verified:** required Knox hooks and bridge were observed in a live Windows process; movement/combat and persistence still have remaining live acceptance.

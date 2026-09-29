@@ -2,7 +2,7 @@ plugins { base }
 
 allprojects {
     group = "com.knoxbridge"
-    version = "0.1.0-alpha1"
+    version = "0.1.0-alpha2"
     repositories { mavenCentral() }
 }
 
@@ -73,7 +73,8 @@ val writeChecksums by tasks.registering {
 }
 
 tasks.register<Zip>("packageRuntime") {
-    dependsOn("verify", "stageExampleMod", "writeChecksums", "buildWindowsBootstrap")
+    dependsOn("verify", "stageExampleMod", "writeChecksums")
+    if (System.getProperty("os.name").lowercase().contains("windows")) dependsOn("buildWindowsBootstrap")
     archiveBaseName.set("knoxbridge-runtime")
     archiveVersion.set(project.version.toString())
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
@@ -88,6 +89,33 @@ tasks.register<Zip>("packageRuntime") {
     from("bootstrap-windows/src/knoxbridge_bootstrap.cpp") { into("bootstrap-windows/src") }
     from("bootstrap-windows/README.md") { into("bootstrap-windows") }
     from("docs") { into("docs") }
+    from("THIRD_PARTY_NOTICES.md")
+    from("README.md")
+}
+
+tasks.register<Zip>("packageManualInstaller") {
+    group = "distribution"
+    description = "Builds the player setup package for Windows, Linux, and macOS."
+    dependsOn(":runtime-core:jar", "writeChecksums")
+    if (System.getProperty("os.name").lowercase().contains("windows")) dependsOn("buildWindowsBootstrap")
+    archiveBaseName.set("KnoxBridgeRuntime")
+    archiveVersion.set(project.version.toString())
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    from("KnoxBridge Setup.cmd")
+    from(project(":runtime-core").layout.buildDirectory.dir("libs")) {
+        include("knoxbridge-agent-${project.version}.jar", "knoxbridge-agent-${project.version}.jar.sha256")
+    }
+    from(layout.projectDirectory.file("bootstrap-windows/build/knoxbridge-bootstrap.dll")) {
+        into("bootstrap-windows")
+    }
+    from(layout.projectDirectory.file("bootstrap-windows/build/knoxbridge-bootstrap.dll.sha256")) {
+        into("bootstrap-windows")
+    }
+    from("scripts") {
+        include("user-setup.ps1", "install.ps1", "uninstall.ps1", "verify-installation.ps1", "setup-unix.sh", "setup-unix.py")
+        into("scripts")
+    }
+    from(files("docs/INSTALLATION.md", "docs/RELEASE_NOTES.md")) { into("docs") }
     from("THIRD_PARTY_NOTICES.md")
     from("README.md")
 }
