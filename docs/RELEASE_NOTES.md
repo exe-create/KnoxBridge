@@ -53,3 +53,11 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Build 42 UI visibility, file-path access, and end-to-end restart acceptance remain unverified.
 - Windows Defender has flagged a local unsigned setup build; do not release or run a flagged build. A fresh approved scan and live Build 42 replay are required before publishing binaries.
 - Offline decision and metadata checks pass. Visibility/focus during real PZ startup and full Build 42 acceptance remain live-unverified.
+
+# KnoxBridge Runtime 0.1.0-alpha8 source candidate
+- Open the Bridge Java review as a full-screen gate at the PZ main menu before entering a world.
+- Keep unknown or changed JAR hashes blocked by default and visible; only compatible modules can be allowed.
+- Add an optional remember toggle: unchecked choices apply once, while checked choices persist for the exact JAR hash.
+- Require one quit/relaunch only when a choice changes which Java modules are loaded. An unchanged allow or an already blocked file does not require a restart.
+- Keep accepting the version-1 queued decision format and add version-2 once/remember choices.
+- Offline validation is recorded separately from live Build 42 visibility, gate, persistence, and restart acceptance.

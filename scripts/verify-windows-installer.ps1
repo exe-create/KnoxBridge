@@ -1,6 +1,6 @@
 param(
     [string]$Installer = (Join-Path $PSScriptRoot '..\bootstrap-windows\build\KnoxBridgeSetup.exe'),
-    [string]$PackageZip = (Join-Path $PSScriptRoot '..\build\distributions\KnoxBridgeRuntime-0.1.0-alpha7.zip')
+    [string]$PackageZip = (Join-Path $PSScriptRoot '..\build\distributions\KnoxBridgeRuntime-0.1.0-alpha8.zip')
 )
 $ErrorActionPreference = 'Stop'
 $installerSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\windows-installer\Program.cs') -Raw

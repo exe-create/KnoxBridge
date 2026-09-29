@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class RuntimeVerifier {
+    private static int checks;
     public static void main(String[] args) throws Exception {
         Path temp = Files.createTempDirectory("knoxbridge-verify-");
         Path mod = Files.createDirectories(temp.resolve("enabled-mod"));
@@ -53,15 +54,34 @@ public final class RuntimeVerifier {
         check(reviewTrust.check(hash) == TrustStore.Decision.APPROVAL_REQUIRED, "unknown module defaults blocked");
         Path queue = temp.resolve("Lua/KnoxBridge/module-decisions.txt");
         Files.createDirectories(queue.getParent());
-        Files.writeString(queue, ModuleReviewFiles.DECISIONS_HEADER + "\n" + hash + "\tallow\n"
+        Files.writeString(queue, ModuleReviewFiles.DECISIONS_HEADER + "\n" + hash + "\tallow\tremember\n"
                 + ModuleReviewFiles.DECISIONS_COMMIT + "\n");
         ModuleReviewFiles.applyQueuedDecisions(reviewTrust, queue, s -> { });
         check(reviewTrust.check(hash) == TrustStore.Decision.ALLOW_EXACT && !Files.exists(queue),
             "in-game approval persists exact-hash allow for the next startup");
+        String legacyQueueHash = "5".repeat(64);
+        Files.writeString(queue, "KNOXBRIDGE-DECISIONS-1\n" + legacyQueueHash + "\tdeny\n"
+                + ModuleReviewFiles.DECISIONS_COMMIT + "\n");
+        ModuleReviewFiles.applyQueuedDecisions(reviewTrust, queue, s -> { });
+        check(reviewTrust.check(legacyQueueHash) == TrustStore.Decision.DENY_EXACT,
+            "legacy version-1 review queue remains readable as a remembered decision");
+        String oneTimeHash = "3".repeat(64);
+        Files.writeString(queue, ModuleReviewFiles.DECISIONS_HEADER + "\n" + oneTimeHash + "\tallow\tonce\n"
+                + ModuleReviewFiles.DECISIONS_COMMIT + "\n");
+        ModuleReviewFiles.applyQueuedDecisions(reviewTrust, queue, s -> { });
+        check(reviewTrust.check(oneTimeHash) == TrustStore.Decision.ALLOW_ONCE
+                && reviewTrust.check(oneTimeHash) == TrustStore.Decision.APPROVAL_REQUIRED,
+            "unchecked remember option grants an exact-hash approval for one launch only");
+        String rememberedDenyHash = "4".repeat(64);
+        Files.writeString(queue, ModuleReviewFiles.DECISIONS_HEADER + "\n" + rememberedDenyHash + "\tdeny\tremember\n"
+                + ModuleReviewFiles.DECISIONS_COMMIT + "\n");
+        ModuleReviewFiles.applyQueuedDecisions(reviewTrust, queue, s -> { });
+        check(reviewTrust.check(rememberedDenyHash) == TrustStore.Decision.DENY_EXACT,
+            "checked remember option persists exact-hash deny");
         String changedReviewHash = "1".repeat(64);
         check(reviewTrust.check(changedReviewHash) == TrustStore.Decision.APPROVAL_REQUIRED,
             "changed JAR remains blocked after another exact hash is allowed");
-        Files.writeString(queue, ModuleReviewFiles.DECISIONS_HEADER + "\ninvalid\tallow\n"
+        Files.writeString(queue, ModuleReviewFiles.DECISIONS_HEADER + "\ninvalid\tallow\tremember\n"
                 + ModuleReviewFiles.DECISIONS_COMMIT + "\n");
         ModuleReviewFiles.applyQueuedDecisions(reviewTrust, queue, s -> { });
         check(reviewTrust.check("2".repeat(64)) == TrustStore.Decision.APPROVAL_REQUIRED,
@@ -164,10 +184,13 @@ public final class RuntimeVerifier {
         check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-agentlib:exampleRuntime")), "native instrumentation conflict detected");
         check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-javaagent:another-runtime.jar")), "competing Java agent conflict detected");
         check(!KnoxBridgeAgent.hasCompetingBootstrap(List.of("-javaagent:C:/game/.knoxbridge/knoxbridge-agent.jar")), "KnoxBridge agent not treated as foreign");
-        System.out.println("KnoxBridge offline verification PASS checks=46");
+        System.out.println("KnoxBridge offline verification PASS checks=" + checks);
     }
 
-    private static void check(boolean ok, String name) { if (!ok) throw new AssertionError(name); }
+    private static void check(boolean ok, String name) {
+        checks++;
+        if (!ok) throw new AssertionError(name);
+    }
 
     private static final class SignatureFixture {
         void loadMods(List<String> mods) { if (mods.isEmpty()) throw new IllegalArgumentException(); }

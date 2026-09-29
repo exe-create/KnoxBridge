@@ -14,7 +14,7 @@ import java.lang.management.ManagementFactory;
 /** Early JVM bootstrap and PZ-specific adapter owner. */
 public final class KnoxBridgeAgent {
     private static final String VERSION = KnoxBridgeAgent.class.getPackage().getImplementationVersion() == null
-        ? "0.1.0-alpha7" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
+        ? "0.1.0-alpha8" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
     private static final AtomicBoolean STARTED = new AtomicBoolean();
     private static final AtomicBoolean MODULES_STARTED = new AtomicBoolean();
     private static final List<ModuleLoader.LoadedModule> LOADED = new CopyOnWriteArrayList<>();

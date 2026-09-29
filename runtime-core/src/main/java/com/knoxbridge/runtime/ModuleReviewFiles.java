@@ -17,12 +17,13 @@ final class ModuleReviewFiles {
     static final String MANIFEST_NAME = "module-review.txt";
     static final String DECISIONS_NAME = "module-decisions.txt";
     static final String MANIFEST_HEADER = "KNOXBRIDGE-MODULES-2";
-    static final String DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-1";
+    static final String DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-2";
+    private static final String LEGACY_DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-1";
     static final String DECISIONS_COMMIT = "KNOXBRIDGE-COMMIT-1";
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 
     record Entry(String id, String version, String hash, String name, String author, String state, String jarName) { }
-    private record QueuedDecision(String hash, TrustStore.Decision decision) { }
+    private record QueuedDecision(String hash, TrustStore.Decision decision, boolean remember) { }
 
     private ModuleReviewFiles() { }
 
@@ -36,7 +37,9 @@ final class ModuleReviewFiles {
     static void applyQueuedDecisions(TrustStore trust, Path queuePath, java.util.function.Consumer<String> log) throws IOException {
         if (!Files.isRegularFile(queuePath)) return;
         List<String> lines = Files.readAllLines(queuePath, StandardCharsets.UTF_8);
-        if (lines.size() < 2 || !DECISIONS_HEADER.equals(lines.get(0))
+        boolean version2 = !lines.isEmpty() && DECISIONS_HEADER.equals(lines.get(0));
+        boolean version1 = !lines.isEmpty() && LEGACY_DECISIONS_HEADER.equals(lines.get(0));
+        if (lines.size() < 2 || (!version1 && !version2)
                 || !DECISIONS_COMMIT.equals(lines.get(lines.size() - 1))) {
             log.accept("module review queue ignored reason=invalid-header; no decisions applied");
             return;
@@ -48,22 +51,31 @@ final class ModuleReviewFiles {
             String line = lines.get(i);
             if (line.isBlank()) continue;
             String[] fields = line.split("\\t", -1);
-            if (fields.length != 2 || !SHA256.matcher(fields[0]).matches()
+            if ((version2 ? fields.length != 3 : fields.length != 2) || !SHA256.matcher(fields[0]).matches()
                     || !("allow".equals(fields[1]) || "deny".equals(fields[1]))) {
                 log.accept("module review queue ignored reason=invalid-row; no decisions applied");
                 return;
             }
+            boolean remember = !version2 || "remember".equals(fields[2]);
+            if (version2 && !remember && !"once".equals(fields[2])) {
+                log.accept("module review queue ignored reason=invalid-row; no decisions applied");
+                return;
+            }
             TrustStore.Decision decision = "allow".equals(fields[1])
-                ? TrustStore.Decision.ALLOW_EXACT : TrustStore.Decision.DENY_EXACT;
+                ? (remember ? TrustStore.Decision.ALLOW_EXACT : TrustStore.Decision.ALLOW_ONCE)
+                : (remember ? TrustStore.Decision.DENY_EXACT : TrustStore.Decision.DENY_ONCE);
             TrustStore.Decision previous = unique.putIfAbsent(fields[0], decision);
             if (previous != null && previous != decision) {
                 log.accept("module review queue ignored reason=conflicting-duplicate; no decisions applied");
                 return;
             }
-            if (previous == null) decisions.add(new QueuedDecision(fields[0], decision));
+            if (previous == null) decisions.add(new QueuedDecision(fields[0], decision, remember));
         }
 
-        for (QueuedDecision decision : decisions) trust.decide(decision.hash(), decision.decision());
+        for (QueuedDecision decision : decisions) {
+            if (decision.remember()) trust.decide(decision.hash(), decision.decision());
+            else trust.decideNextLaunch(decision.hash(), decision.decision());
+        }
         Files.deleteIfExists(queuePath);
         log.accept("module review decisions applied count=" + decisions.size() + " scope=exact-jar-hash");
     }

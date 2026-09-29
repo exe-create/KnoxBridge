@@ -39,17 +39,38 @@ assert(review.parseManifest({ "wrong-version" }) == nil, "unknown manifest versi
 assert(review.parseManifest({ "KNOXBRIDGE-MODULES-2", "bad\trow\tbad\trow" }) == nil,
     "malformed or hashless manifest row accepted")
 
-local decisions = review.serializeDecisions({ [hash] = "allow", [string.rep("c", 64)] = "deny", invalid = "allow" })
-assert(decisions:find("KNOXBRIDGE-DECISIONS-1", 1, true), "decision format header missing")
-assert(decisions:find(hash .. "\tallow", 1, true), "allow choice missing from queue")
-assert(decisions:find(string.rep("c", 64) .. "\tdeny", 1, true), "deny choice missing from queue")
+local decisions = review.serializeDecisions({
+    [hash] = { decision = "allow", remember = true },
+    [string.rep("c", 64)] = { decision = "deny", remember = false },
+    invalid = { decision = "allow", remember = true },
+})
+assert(decisions:find("KNOXBRIDGE-DECISIONS-2", 1, true), "decision format header missing")
+assert(decisions:find(hash .. "\tallow\tremember", 1, true), "remembered allow choice missing from queue")
+assert(decisions:find(string.rep("c", 64) .. "\tdeny\tonce", 1, true), "one-time deny choice missing from queue")
 assert(decisions:find("KNOXBRIDGE-COMMIT-1", 1, true), "partial-write guard missing")
 assert(not decisions:find("invalid", 1, true), "invalid hash entered trust queue")
+local legacyQueue = review.parseDecisionQueue({
+    "KNOXBRIDGE-DECISIONS-1", hash .. "\tallow", "KNOXBRIDGE-COMMIT-1",
+})
+assert(legacyQueue[hash].decision == "allow" and legacyQueue[hash].remember,
+    "legacy queue choices remain remembered when read by the updated UI")
+local onceQueue = review.parseDecisionQueue({
+    "KNOXBRIDGE-DECISIONS-2", hash .. "\tallow\tonce", "KNOXBRIDGE-COMMIT-1",
+})
+assert(onceQueue[hash].decision == "allow" and not onceQueue[hash].remember,
+    "one-launch queue is read without upgrading it to a remembered choice")
+assert(review.choiceChangesLoadedSet(compatible, "allow"), "new allow must request restart to load the module")
+assert(not review.choiceChangesLoadedSet(compatible, "deny"), "blocking a default-denied module must not request restart")
+assert(not review.choiceChangesLoadedSet({ state = "ALLOWED" }, "allow"), "unchanged allow must not restart")
+assert(review.choiceChangesLoadedSet({ state = "ALLOWED" }, "deny"), "denying a loaded module must request restart")
 
 for _, size in ipairs({ { 800, 600 }, { 1920, 1080 }, { 640, 480 } }) do
     local bounds = review.layout(size[1], size[2])
     assert(bounds.x >= 0 and bounds.y >= 0 and bounds.x + bounds.width <= size[1]
         and bounds.y + bounds.height <= size[2], "review layout exceeded the screen")
 end
+local gate = review.layout(1920, 1080, true)
+assert(gate.x == 12 and gate.y == 12 and gate.width == 1896 and gate.height == 1056,
+    "startup review gate must cover the main menu")
 
-print("KnoxBridge Workshop UI offline checks PASS checks=17")
+print("KnoxBridge Workshop UI offline checks PASS checks=24")

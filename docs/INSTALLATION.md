@@ -1,6 +1,6 @@
 # Player setup
 
-**Release note:** The in-game review UI described below is in the alpha7 source candidate and is not part of the published alpha5 download or current Workshop payload. It requires a new KnoxBridge runtime package and updated KnoxBridge Workshop item. Knox Survivors does not need a runtime code update for this feature.
+**Release note:** The full-screen startup review gate and optional remember choices are in the alpha8 source candidate. They require the matching KnoxBridge runtime package and Workshop payload. Knox Survivors does not need a runtime code update for this feature.
 
 KnoxBridge has a Steam Workshop dependency marker and a separate player setup download. The Workshop item carries PZ metadata, the compile-time API JAR, and concise player/mod-author guides; it does not install or activate the runtime. Download player setup from [KnoxBridge GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest). The separate Knox Survivors Launcher is deprecated and unsupported. Do not download or use its old releases, or combine it or a direct legacy Knox agent with KnoxBridge.
 
@@ -24,7 +24,7 @@ The release includes a Unix setup helper. It uses Python 3 from the standard lib
 3. Close Steam, open a terminal in the extracted folder, and run `sh scripts/setup-unix.sh`.
 4. Choose **1** to install/update. If setup asks for a `localconfig.vdf` path, select the one under your Steam `userdata/<account>/config/` directory.
 5. Reopen Steam, enable **KnoxBridge Runtime** and Knox Survivors in the PZ Mods menu, and start normally.
-6. At the main menu, use **Review Java Mods** to inspect the enabled mods' JAR files and save exact-hash allow/deny choices for the next full launch. Unknown JARs remain blocked by default. This menu is not yet live-verified on Linux/macOS. If its file bridge cannot be used, leave the module blocked and report the problem.
+6. At the PZ main menu, review enabled-mod JARs in the full-screen gate before entering a world. Unknown JARs remain blocked unless allowed. Leave **Remember choices** off for one-launch decisions or turn it on to save exact-hash decisions. If a decision changes which modules load, quit and relaunch once to apply it. If the file bridge cannot be used, leave the module blocked and report the problem.
 
 The helper backs up the exact Steam config before its first edit, records the installed hash, preserves other launch options, and removes only its own option if Steam settings change later. Choose **2** to uninstall. Do not run the helper while Steam is open; Steam can overwrite its local config while running.
 
@@ -32,7 +32,7 @@ Linux/macOS continue to use the `KnoxBridgeRuntime-*.zip` archive and `scripts/s
 
 ## Trust and safety
 
-Unknown or changed Java module JARs are blocked by default. The Bridge Workshop main-menu review screen shows JARs discovered under enabled PZ mods, claimed author metadata (unverified), and the exact SHA-256. The screen writes exact-hash choices for the next launch; it never loads a Java module late in the current session. Only a valid KnoxBridge descriptor/API module can be allowed. Other JARs remain blocked until their author integrates with KnoxBridge. If the review UI cannot save a decision, leave that module blocked and report the problem. Java modules run with the same permissions as Project Zomboid and are not sandboxed. Approve only code you trust. The independent test module is a developer fixture and is not installed by the player setup.
+Unknown or changed Java module JARs are blocked by default. The Bridge Workshop review gate opens at the PZ main menu before a player can enter a world. It shows enabled-mod JAR names, unverified author metadata, and exact SHA-256 hashes. Only a valid KnoxBridge descriptor/API module can be allowed. Unchecked choices apply for one launch; enable **Remember choices** to persist exact-hash decisions. A changed module load set requires one quit/relaunch; unchanged choices do not. If the review UI cannot save a decision, leave that module blocked and report the problem. Java modules run with the same permissions as Project Zomboid and are not sandboxed. Approve only code you trust. The independent test module is a developer fixture and is not installed by the player setup.
 
 ## Workshop publishing
 
@@ -40,7 +40,7 @@ Run `scripts/stage-workshop.ps1` on Windows to prepare the KnoxBridge Workshop i
 
 ## Acceptance boundaries
 
-- **Offline verified:** alpha7 runtime inventory/decision checks, Windows native-installer fixtures, archive integrity, Bridge Workshop Lua checks, and Unix config helper tests. This does not establish Build 42 UI behavior or antivirus clearance for any EXE.
+- **Offline verified:** alpha8 runtime inventory and once/remember decision checks, Windows native-installer fixtures, archive integrity, Bridge Workshop Lua checks, and Unix config helper tests. This does not establish Build 42 UI behavior or antivirus clearance for any EXE.
 - **Wrapper smoke verified:** Windows native bootstrap against the copied launcher fixture.
 - **Real PZ 42.21 verified on the prior runtime build:** Windows normal Steam startup, enabled-mod discovery, unknown-hash block, approved module load, and restore/uninstall/reinstall. The new Bridge Workshop menu, enabled-JAR inventory, next-launch allow/deny queue, updated Windows package, and normal no-installer trust flow still need fresh Build 42 replay.
 - **Unix setup implemented, not live verified:** Linux/macOS Steam config editing and direct Java-agent launch path.

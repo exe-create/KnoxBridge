@@ -7,7 +7,8 @@ local Panel = ISPanel:derive("KnoxBridgeModuleReviewPanel")
 local MANIFEST_FILE = "KnoxBridge/module-review.txt"
 local DECISIONS_FILE = "KnoxBridge/module-decisions.txt"
 local MANIFEST_HEADER = "KNOXBRIDGE-MODULES-2"
-local DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-1"
+local DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-2"
+local LEGACY_DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-1"
 local DECISIONS_COMMIT = "KNOXBRIDGE-COMMIT-1"
 local BUTTON_KEY = "knoxBridgeModuleReviewButton"
 local PANEL_KEY = "knoxBridgeModuleReviewPanel"
@@ -68,18 +69,26 @@ local function parseManifest(lines)
     return modules
 end
 
-local function readQueuedDecisions()
-    local lines = readLines(DECISIONS_FILE)
+local function parseDecisionQueue(lines)
     local pending = {}
-    if not lines or #lines < 2 or lines[1] ~= DECISIONS_HEADER
+    local version2 = lines and lines[1] == DECISIONS_HEADER
+    local version1 = lines and lines[1] == LEGACY_DECISIONS_HEADER
+    if not lines or #lines < 2 or (not version1 and not version2)
         or lines[#lines] ~= DECISIONS_COMMIT then return pending end
     for index = 2, #lines - 1 do
-        local fields = splitTsv(lines[index], 2)
+        local fields = splitTsv(lines[index], version2 and 3 or 2)
         if fields and validHash(fields[1]) and (fields[2] == "allow" or fields[2] == "deny") then
-            pending[fields[1]] = fields[2]
+            local remember = version1 or fields[3] == "remember"
+            if version1 or remember or fields[3] == "once" then
+                pending[fields[1]] = { decision = fields[2], remember = remember }
+            end
         end
     end
     return pending
+end
+
+local function readQueuedDecisions()
+    return parseDecisionQueue(readLines(DECISIONS_FILE))
 end
 
 local function saveQueuedDecisions(pending)
@@ -94,12 +103,18 @@ end
 
 function Review.serializeDecisions(pending)
     local hashes = {}
-    for hash, decision in pairs(pending) do
+    for hash, choice in pairs(pending) do
+        local decision = type(choice) == "table" and choice.decision or choice
         if validHash(hash) and (decision == "allow" or decision == "deny") then hashes[#hashes + 1] = hash end
     end
     table.sort(hashes)
-    local content = DECISIONS_HEADER .. "\n"
-    for _, hash in ipairs(hashes) do content = content .. hash .. "\t" .. pending[hash] .. "\n" end
+    local content = "KNOXBRIDGE-DECISIONS-2\n"
+    for _, hash in ipairs(hashes) do
+        local choice = pending[hash]
+        local decision = type(choice) == "table" and choice.decision or choice
+        local remember = type(choice) ~= "table" or choice.remember ~= false
+        content = content .. hash .. "\t" .. decision .. "\t" .. (remember and "remember" or "once") .. "\n"
+    end
     content = content .. DECISIONS_COMMIT .. "\n"
     return content
 end
@@ -110,8 +125,13 @@ local function canAllow(module)
 end
 
 Review.parseManifest = parseManifest
+Review.parseDecisionQueue = parseDecisionQueue
 Review.validHash = validHash
 Review.canAllow = canAllow
+function Review.choiceChangesLoadedSet(module, decision)
+    return (decision == "allow" and module.state ~= "ALLOWED")
+        or (decision == "deny" and module.state == "ALLOWED")
+end
 
 function Panel:new(x, y, width, height, modules, manifestError)
     local object = ISPanel:new(x, y, width, height)
@@ -120,7 +140,10 @@ function Panel:new(x, y, width, height, modules, manifestError)
     object.modules = modules or {}
     object.manifestError = manifestError
     object.pending = readQueuedDecisions()
-    object.statusText = "New and unknown JARs are blocked. Choices save by exact SHA-256 and apply after restarting the game."
+    object.rememberChoices = false
+    object.startupGate = Review.startupGate == true
+    object.restartRequired = false
+    object.statusText = "Unknown JARs are blocked until approved. Review choices before entering a world."
     object:initialise()
     object:instantiate()
     object.backgroundColor = { r = 0.04, g = 0.05, b = 0.06, a = 0.97 }
@@ -149,7 +172,7 @@ function Panel:createChildren()
         if alternate then list:drawRect(0, y, list:getWidth(), list.itemheight, 0.12, 0.1, 0.12, 0.14) end
         local module = item.item
         local queued = module.hash ~= "" and self.pending[module.hash] or nil
-        local state = queued and (string.upper(queued) .. " ON NEXT LAUNCH") or module.state
+        local state = queued and (string.upper(queued.decision) .. (queued.remember and " REMEMBERED" or " ONCE NEXT LAUNCH")) or module.state
         list:drawText(module.jarName .. "  —  " .. state, 8, y + 4, 0.95, 0.95, 0.95, 1, UIFont.Small)
         list:drawText(module.name .. "  |  " .. module.id, 8, y + 25, 0.72, 0.78, 0.82, 1, UIFont.Small)
         return y + list.itemheight
@@ -182,9 +205,12 @@ function Panel:createChildren()
     self.denyButton = ISButton:new(rightX, 306, rightWidth, 34, "Keep JAR denied", self, self.onDeny)
     self.denyButton:initialise()
     self:addChild(self.denyButton)
-    local close = ISButton:new(self.width - 138, self.height - 52, 120, 34, "Close", self, self.onClose)
-    close:initialise()
-    self:addChild(close)
+    self.rememberButton = ISButton:new(margin, self.height - 52, 240, 34, "Remember choices: OFF", self, self.onToggleRemember)
+    self.rememberButton:initialise()
+    self:addChild(self.rememberButton)
+    self.continueButton = ISButton:new(self.width - 258, self.height - 52, 240, 34, "Continue", self, self.onClose)
+    self.continueButton:initialise()
+    self:addChild(self.continueButton)
     self.statusLabel = ISLabel:new(margin, self.height - 68, 18, self.statusText, 0.86, 0.88, 0.9, 1, UIFont.Small, true)
     self.statusLabel:initialise()
     self:addChild(self.statusLabel)
@@ -229,9 +255,14 @@ function Panel:showSelection()
     self.versionLabel:setName("Version: " .. module.version)
     self.stateLabel:setName("State: " .. module.state)
     local queued = module.hash ~= "" and self.pending[module.hash] or nil
+    local queuedDecision = queued and queued.decision or nil
+    local queuedMatches = queued and queued.remember == self.rememberChoices
     local compatible = canAllow(module)
-    self.allowButton:setEnable(compatible and queued ~= "allow")
-    self.denyButton:setEnable(validHash(module.hash) and queued ~= "deny")
+    self.allowButton:setEnable(compatible and (module.state ~= "ALLOWED" or self.rememberChoices)
+        and (queuedDecision ~= "allow" or not queuedMatches))
+    self.denyButton:setEnable(validHash(module.hash) and (module.state ~= "DENIED" or self.rememberChoices)
+        and (queuedDecision ~= "deny" or not queuedMatches))
+    self.continueButton:setTitle(self.restartRequired and "Quit to restart" or "Continue")
 end
 
 function Panel:queueDecision(decision)
@@ -239,13 +270,25 @@ function Panel:queueDecision(decision)
     if not module or not validHash(module.hash) then return end
     if decision == "allow" and not canAllow(module) then return end
     local previous = self.pending[module.hash]
-    self.pending[module.hash] = decision
+    if previous and previous.decision == decision and previous.remember == self.rememberChoices then return end
+    self.pending[module.hash] = { decision = decision, remember = self.rememberChoices }
     local ok, reason = saveQueuedDecisions(self.pending)
     if not ok then
         self.pending[module.hash] = previous
         self.statusText = "Could not save the choice: " .. tostring(reason)
     else
-        self.statusText = "Saved for the next launch. Restart Project Zomboid to apply."
+        local changesLoadedSet = Review.choiceChangesLoadedSet(module, decision)
+        self.restartRequired = false
+        for _, candidate in ipairs(self.modules) do
+            local choice = candidate.hash ~= "" and self.pending[candidate.hash] or nil
+            if choice and Review.choiceChangesLoadedSet(candidate, choice.decision) then
+                self.restartRequired = true
+                break
+            end
+        end
+        self.statusText = changesLoadedSet
+            and "Saved. Quit and restart Project Zomboid to apply this change."
+            or "Saved. The blocked default is unchanged; no restart is needed."
     end
     self.statusLabel:setName(self.statusText)
     self:refreshList()
@@ -254,7 +297,24 @@ end
 
 function Panel:onAllow() self:queueDecision("allow") end
 function Panel:onDeny() self:queueDecision("deny") end
-function Panel:onClose() self:setVisible(false) end
+function Panel:onToggleRemember()
+    self.rememberChoices = not self.rememberChoices
+    self.rememberButton:setTitle(self.rememberChoices and "Remember choices: ON" or "Remember choices: OFF")
+    self:showSelection()
+end
+function Panel:onClose()
+    if self.restartRequired then
+        local ok, reason = pcall(function() getCore():quit() end)
+        if not ok then
+            self.statusText = "Saved. Restart Project Zomboid to apply. " .. tostring(reason)
+            self.statusLabel:setName(self.statusText)
+        end
+        return
+    end
+    self.startupGate = false
+    Review.startupGate = false
+    self:setVisible(false)
+end
 
 local function readModules()
     local lines, readError = readLines(MANIFEST_FILE)
@@ -266,9 +326,9 @@ local function readModules()
     return modules, nil
 end
 
-function Review.layout(screenWidth, screenHeight)
-    local width = math.max(360, math.min(1040, screenWidth - 24))
-    local height = math.max(320, math.min(680, screenHeight - 24))
+function Review.layout(screenWidth, screenHeight, startupGate)
+    local width = startupGate and math.max(360, screenWidth - 24) or math.max(360, math.min(1040, screenWidth - 24))
+    local height = startupGate and math.max(320, screenHeight - 24) or math.max(320, math.min(680, screenHeight - 24))
     return { x = math.floor((screenWidth - width) / 2), y = math.floor((screenHeight - height) / 2), width = width, height = height }
 end
 
@@ -284,7 +344,7 @@ function Review.open()
         return true
     end
     local core = getCore()
-    local bounds = Review.layout(core:getScreenWidth(), core:getScreenHeight())
+    local bounds = Review.layout(core:getScreenWidth(), core:getScreenHeight(), Review.startupGate)
     local modules, manifestError = readModules()
     local panel = Panel:new(bounds.x, bounds.y, bounds.width, bounds.height, modules, manifestError)
     screen:addChild(panel)
@@ -310,7 +370,7 @@ function Review.ensureButton()
     button:setAnchorBottom(false)
     button.backgroundColor = { r = 0.14, g = 0.25, b = 0.34, a = 0.96 }
     button.backgroundColorMouseOver = { r = 0.20, g = 0.38, b = 0.50, a = 1 }
-    button.tooltip = "Review enabled-mod JAR files; unsupported JARs stay blocked. Choices apply next launch."
+    button.tooltip = "Review enabled-mod JAR files; unknown files stay blocked until approved."
     screen:addChild(button)
     screen[BUTTON_KEY] = button
     return true
@@ -318,6 +378,7 @@ end
 
 local function onMainMenuEnter()
     Review.ensureButton()
+    Review.startupGate = true
     Review.autoPending = true
 end
 
