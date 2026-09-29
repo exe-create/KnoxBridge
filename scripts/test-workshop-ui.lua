@@ -63,6 +63,17 @@ assert(review.choiceChangesLoadedSet(compatible, "allow"), "new allow must reque
 assert(not review.choiceChangesLoadedSet(compatible, "deny"), "blocking a default-denied module must not request restart")
 assert(not review.choiceChangesLoadedSet({ state = "ALLOWED" }, "allow"), "unchanged allow must not restart")
 assert(review.choiceChangesLoadedSet({ state = "ALLOWED" }, "deny"), "denying a loaded module must request restart")
+local pendingUndo = { [hash] = { decision = "allow", remember = false } }
+assert(review.hasPendingChoice(pendingUndo, compatible), "selected JAR should expose undo for its pending choice")
+assert(review.pendingRestartRequired(modules, pendingUndo), "pending allow should keep the single restart requirement")
+local loadedModule = { hash = string.rep("e", 64), state = "ALLOWED" }
+pendingUndo[loadedModule.hash] = { decision = "deny", remember = true }
+pendingUndo[hash] = nil
+assert(not review.hasPendingChoice(pendingUndo, compatible), "undo should remove the selected pending choice")
+assert(review.pendingRestartRequired({ compatible, loadedModule }, pendingUndo), "undoing one JAR must preserve another JAR's restart requirement")
+pendingUndo[loadedModule.hash] = nil
+assert(not review.pendingRestartRequired({ compatible, loadedModule }, pendingUndo), "undoing all load-set changes should clear restart requirement")
+assert(not review.hasPendingChoice(pendingUndo, unsupported), "unsupported JAR without a queued choice should not expose undo")
 
 for _, size in ipairs({ { 800, 600 }, { 1920, 1080 }, { 640, 480 } }) do
     local bounds = review.layout(size[1], size[2])
@@ -73,4 +84,4 @@ local gate = review.layout(1920, 1080, true)
 assert(gate.x == 12 and gate.y == 12 and gate.width == 1896 and gate.height == 1056,
     "startup review gate must cover the main menu")
 
-print("KnoxBridge Workshop UI offline checks PASS checks=24")
+print("KnoxBridge Workshop UI offline checks PASS checks=30")

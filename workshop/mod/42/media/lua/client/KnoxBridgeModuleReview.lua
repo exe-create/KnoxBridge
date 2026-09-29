@@ -133,6 +133,18 @@ function Review.choiceChangesLoadedSet(module, decision)
         or (decision == "deny" and module.state == "ALLOWED")
 end
 
+function Review.hasPendingChoice(pending, module)
+    return module ~= nil and validHash(module.hash) and pending[module.hash] ~= nil or false
+end
+
+function Review.pendingRestartRequired(modules, pending)
+    for _, candidate in ipairs(modules) do
+        local choice = candidate.hash ~= "" and pending[candidate.hash] or nil
+        if choice and Review.choiceChangesLoadedSet(candidate, choice.decision) then return true end
+    end
+    return false
+end
+
 function Panel:new(x, y, width, height, modules, manifestError)
     local object = ISPanel:new(x, y, width, height)
     setmetatable(object, self)
@@ -205,8 +217,9 @@ function Panel:createChildren()
     self.denyButton = ISButton:new(rightX, 306, rightWidth, 34, "Keep JAR denied", self, self.onDeny)
     self.denyButton:initialise()
     self:addChild(self.denyButton)
-    self.rememberButton = ISButton:new(margin, self.height - 52, 240, 34, "Remember choices: OFF", self, self.onToggleRemember)
+    self.rememberButton = ISButton:new(margin, self.height - 52, 240, 34, "[ ] Remember next choice", self, self.onToggleRemember)
     self.rememberButton:initialise()
+    self.rememberButton.tooltip = "Save the next Allow or Deny choice for this exact JAR hash across launches."
     self:addChild(self.rememberButton)
     self.continueButton = ISButton:new(self.width - 258, self.height - 52, 240, 34, "Continue", self, self.onClose)
     self.continueButton:initialise()
@@ -245,6 +258,7 @@ function Panel:showSelection()
         self.stateLabel:setName("Only JARs with a valid Bridge descriptor can be allowed; other JARs remain blocked.")
         self.allowButton:setEnable(false)
         self.denyButton:setEnable(false)
+        self.denyButton:setTitle("Keep JAR denied")
         return
     end
     self.detail:setName(module.jarName .. "  |  " .. module.name .. "  |  " .. module.author .. " (unverified claim)")
@@ -260,8 +274,10 @@ function Panel:showSelection()
     local compatible = canAllow(module)
     self.allowButton:setEnable(compatible and (module.state ~= "ALLOWED" or self.rememberChoices)
         and (queuedDecision ~= "allow" or not queuedMatches))
-    self.denyButton:setEnable(validHash(module.hash) and (module.state ~= "DENIED" or self.rememberChoices)
-        and (queuedDecision ~= "deny" or not queuedMatches))
+    local hasPending = Review.hasPendingChoice(self.pending, module)
+    self.denyButton:setTitle(hasPending and "Undo pending choice" or "Keep JAR denied")
+    self.denyButton:setEnable(hasPending or (validHash(module.hash) and (module.state ~= "DENIED" or self.rememberChoices)
+        and (queuedDecision ~= "deny" or not queuedMatches)))
     self.continueButton:setTitle(self.restartRequired and "Quit to restart" or "Continue")
 end
 
@@ -278,14 +294,7 @@ function Panel:queueDecision(decision)
         self.statusText = "Could not save the choice: " .. tostring(reason)
     else
         local changesLoadedSet = Review.choiceChangesLoadedSet(module, decision)
-        self.restartRequired = false
-        for _, candidate in ipairs(self.modules) do
-            local choice = candidate.hash ~= "" and self.pending[candidate.hash] or nil
-            if choice and Review.choiceChangesLoadedSet(candidate, choice.decision) then
-                self.restartRequired = true
-                break
-            end
-        end
+        self.restartRequired = Review.pendingRestartRequired(self.modules, self.pending)
         self.statusText = changesLoadedSet
             and "Saved. Quit and restart Project Zomboid to apply this change."
             or "Saved. The blocked default is unchanged; no restart is needed."
@@ -296,10 +305,31 @@ function Panel:queueDecision(decision)
 end
 
 function Panel:onAllow() self:queueDecision("allow") end
-function Panel:onDeny() self:queueDecision("deny") end
+function Panel:onDeny()
+    if Review.hasPendingChoice(self.pending, self.selectedModule) then return self:onUndo() end
+    self:queueDecision("deny")
+end
+function Panel:onUndo()
+    local module = self.selectedModule
+    if not Review.hasPendingChoice(self.pending, module) then return end
+    local previous = self.pending[module.hash]
+    self.pending[module.hash] = nil
+    local ok, reason = saveQueuedDecisions(self.pending)
+    if not ok then
+        self.pending[module.hash] = previous
+        self.statusText = "Could not undo the choice: " .. tostring(reason)
+    else
+        self.restartRequired = Review.pendingRestartRequired(self.modules, self.pending)
+        self.statusText = "Pending choice removed. "
+            .. (self.restartRequired and "Other choices still require one restart." or "No restart is needed.")
+    end
+    self.statusLabel:setName(self.statusText)
+    self:refreshList()
+    self:showSelection()
+end
 function Panel:onToggleRemember()
     self.rememberChoices = not self.rememberChoices
-    self.rememberButton:setTitle(self.rememberChoices and "Remember choices: ON" or "Remember choices: OFF")
+    self.rememberButton:setTitle(self.rememberChoices and "[x] Remember next choice" or "[ ] Remember next choice")
     self:showSelection()
 end
 function Panel:onClose()

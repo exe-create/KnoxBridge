@@ -58,6 +58,7 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Open the Bridge Java review as a full-screen gate at the PZ main menu before entering a world.
 - Keep unknown or changed JAR hashes blocked by default and visible; only compatible modules can be allowed.
 - Add an optional remember toggle: unchecked choices apply once, while checked choices persist for the exact JAR hash.
+- Clarify that the remember control applies to the next decision and let players undo a queued choice before continuing.
 - Require one quit/relaunch only when a choice changes which Java modules are loaded. An unchanged allow or an already blocked file does not require a restart.
 - Keep accepting the version-1 queued decision format and add version-2 once/remember choices.
 - Offline validation is recorded separately from live Build 42 visibility, gate, persistence, and restart acceptance.
