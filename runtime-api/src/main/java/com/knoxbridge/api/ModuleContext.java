@@ -8,6 +8,7 @@ public interface ModuleContext {
     String moduleId();
     String moduleVersion();
     Consumer<String> logger();
+    /** Patch registration is synchronous and valid only during {@link KnoxModule#initialize(ModuleContext)}. */
     PatchRegistrar patches();
     /** JVM instrumentation for trusted modules that need runtime-specific adapters. */
     Instrumentation instrumentation();

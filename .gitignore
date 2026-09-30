@@ -1,16 +1,17 @@
-# Gradle output and local caches
-.gradle/
-**/build/
-**/bin/
-**/obj/
+# Gradle caches and generated outputs for this repository's projects
+**/.gradle/
+/build/
+/runtime-api/build/
+/runtime-core/build/
+/test-module/build/
+/bootstrap-smoke/build/
+/bootstrap-windows/build/
+/examples/minimal-module/build/
+/windows-installer/bin/
+/windows-installer/obj/
 
-# IDE files
+# Generated IntelliJ module files; leave project-level IDE/workflow settings visible.
 *.iml
-.idea/
-.vscode/
-.modforge/
-.codex/
-.opencode/
 
 # Local machine configuration and credentials
 .env

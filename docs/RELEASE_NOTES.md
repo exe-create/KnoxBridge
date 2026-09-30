@@ -68,3 +68,16 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Alpha8 live logs showed the runtime and Knox Survivors module initialized on Project Zomboid 42.21, but selecting a listed JAR raised `attempted index of non-table` in the review callback. The UI click failure was isolated to the callback target binding.
 - Extend the Workshop UI regression checks to exercise the native callback target and selection behavior.
 - Build 42 live verification of the corrected review screen remains required.
+
+# KnoxBridge Runtime 0.1.0-alpha10 source candidate
+- Add an author example that performs an observable ASM patch against a harmless fixture; include the pinned ASM Core and Tree 9.10.1 tool dependency in the agent, with third-party notices. The example compiles against ASM as `compileOnly` and does not bundle duplicate tool classes.
+- Add an author task to inspect exact class/method descriptors in a local Project Zomboid JAR and a task to assemble a ready-to-copy example mod layout. Verify the example package omits bundled KnoxBridge API classes.
+- Scope patch registration to the synchronous `initialize` call. Registrations commit only after successful initialization; late, asynchronous, failed-initialization, and duplicate registrations are rejected or discarded instead of being attributed to another module.
+- Patch diagnostics now include the complete target descriptor. Offline verification exercises successful observable transformation, invalid bytes, missing/ambiguous methods, duplicate IDs, closed scopes, and abandoned registrations.
+- Document API-version policy: binary-compatible additions can remain on the current API version; incompatible API/descriptor changes require a new version accepted explicitly by the runtime. API version does not imply PZ build compatibility.
+- Reset **Remember next choice** after one successfully saved choice; show the selected JAR in list, details, and action labels; restore pending state on reopen. Reopening a queued decision now distinguishes one-launch from remembered choices.
+- Make one-launch trust a scoped override that applies to every matching hash during one PZ launch, then expires without replacing a prior persistent allow/deny. Continue accepting alpha9 trust entries.
+- Require a second explicit confirmation before the UI quits PZ for a load-set change, and tell the player to relaunch through Steam. Automatic Steam/game relaunch is not implemented.
+- Reject malformed/conflicting decision queues as a whole in the Lua UI, matching Java's fail-closed importer; surface queue and write-close errors.
+- Expand offline UI/runtime fixtures for remember reset, selected-item synchronization, invalid queue rejection, quit confirmation, persistent trust restoration, and one-time same-hash reuse. Live Build 42 behavior remains unverified.
+- The current Workshop review gate, trust handoff, packaged alpha10 runtime, live PZ module patches, and Linux/macOS launch paths have not been live-verified for this candidate. No release or compatibility claim is made.

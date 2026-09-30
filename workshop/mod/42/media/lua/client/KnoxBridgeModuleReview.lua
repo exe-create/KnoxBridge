@@ -71,24 +71,39 @@ end
 
 local function parseDecisionQueue(lines)
     local pending = {}
+    if not lines then return pending end
     local version2 = lines and lines[1] == DECISIONS_HEADER
     local version1 = lines and lines[1] == LEGACY_DECISIONS_HEADER
     if not lines or #lines < 2 or (not version1 and not version2)
-        or lines[#lines] ~= DECISIONS_COMMIT then return pending end
+        or lines[#lines] ~= DECISIONS_COMMIT then
+        return nil, "Previous pending decisions are malformed; no queued choices were loaded."
+    end
     for index = 2, #lines - 1 do
-        local fields = splitTsv(lines[index], version2 and 3 or 2)
-        if fields and validHash(fields[1]) and (fields[2] == "allow" or fields[2] == "deny") then
-            local remember = version1 or fields[3] == "remember"
-            if version1 or remember or fields[3] == "once" then
-                pending[fields[1]] = { decision = fields[2], remember = remember }
+        if lines[index] ~= "" then
+            local fields = splitTsv(lines[index], version2 and 3 or 2)
+            if not fields or not validHash(fields[1]) or (fields[2] ~= "allow" and fields[2] ~= "deny") then
+                return nil, "Previous pending decisions are malformed; no queued choices were loaded."
             end
+            local remember = version1 or fields[3] == "remember"
+            if version2 and not remember and fields[3] ~= "once" then
+                return nil, "Previous pending decisions contain an unknown choice scope; no choices were loaded."
+            end
+            local choice = { decision = fields[2], remember = remember }
+            local previous = pending[fields[1]]
+            if previous and (previous.decision ~= choice.decision or previous.remember ~= choice.remember) then
+                return nil, "Previous pending decisions conflict for one JAR hash; no choices were loaded."
+            end
+            pending[fields[1]] = choice
         end
     end
     return pending
 end
 
 local function readQueuedDecisions()
-    return parseDecisionQueue(readLines(DECISIONS_FILE))
+    local lines, readError = readLines(DECISIONS_FILE)
+    if readError then return nil, "Could not read previous pending decisions: " .. tostring(readError) end
+    if not lines then return {} end
+    return parseDecisionQueue(lines)
 end
 
 local function saveQueuedDecisions(pending)
@@ -96,8 +111,9 @@ local function saveQueuedDecisions(pending)
     local ok, writer = pcall(getFileWriter, DECISIONS_FILE, true, false)
     if not ok or not writer then return false, "Could not open the Bridge settings file." end
     local writeOk, writeError = pcall(function() writer:write(content) end)
-    pcall(function() writer:close() end)
+    local closeOk, closeError = pcall(function() writer:close() end)
     if not writeOk then return false, tostring(writeError) end
+    if not closeOk then return false, tostring(closeError) end
     return true
 end
 
@@ -147,9 +163,21 @@ end
 
 function Review.bindSelectionHandler(list, panel)
     list:setOnMouseDownFunction(panel, function(target, module)
-        target.selectedModule = module
-        target:showSelection()
+        Review.selectModule(target, module)
     end)
+end
+
+function Review.selectModule(panel, module)
+    panel.selectedModule = module
+    if panel.moduleList and panel.modules then
+        for index, candidate in ipairs(panel.modules) do
+            if candidate == module then
+                panel.moduleList.selected = index
+                break
+            end
+        end
+    end
+    panel:showSelection()
 end
 
 function Panel:new(x, y, width, height, modules, manifestError)
@@ -158,11 +186,16 @@ function Panel:new(x, y, width, height, modules, manifestError)
     self.__index = self
     object.modules = modules or {}
     object.manifestError = manifestError
-    object.pending = readQueuedDecisions()
+    local pending, pendingError = readQueuedDecisions()
+    object.pending = pending or {}
+    object.pendingError = pendingError
     object.rememberChoices = false
     object.startupGate = Review.startupGate == true
-    object.restartRequired = false
-    object.statusText = "Unknown JARs are blocked until approved. Review choices before entering a world."
+    object.restartRequired = Review.pendingRestartRequired(object.modules, object.pending)
+    object.restartConfirmRequired = false
+    object.statusText = pendingError or (object.restartRequired
+        and "Pending choices need a restart; PZ will not auto-relaunch."
+        or "Unknown JARs are blocked until approved. Review choices before entering a world.")
     object:initialise()
     object:instantiate()
     object.backgroundColor = { r = 0.04, g = 0.05, b = 0.06, a = 0.97 }
@@ -188,11 +221,16 @@ function Panel:createChildren()
     self.moduleList.itemheight = 52
     self.moduleList.drawBorder = true
     self.moduleList.doDrawItem = function(list, y, item, alternate)
-        if alternate then list:drawRect(0, y, list:getWidth(), list.itemheight, 0.12, 0.1, 0.12, 0.14) end
         local module = item.item
+        local selected = module == self.selectedModule
+        if selected then
+            list:drawRect(0, y, list:getWidth(), list.itemheight, 0.62, 0.18, 0.30, 0.39)
+        elseif alternate then
+            list:drawRect(0, y, list:getWidth(), list.itemheight, 0.12, 0.1, 0.12, 0.14)
+        end
         local queued = module.hash ~= "" and self.pending[module.hash] or nil
         local state = queued and (string.upper(queued.decision) .. (queued.remember and " REMEMBERED" or " ONCE NEXT LAUNCH")) or module.state
-        list:drawText(module.jarName .. "  —  " .. state, 8, y + 4, 0.95, 0.95, 0.95, 1, UIFont.Small)
+        list:drawText((selected and "> SELECTED  " or "") .. module.jarName .. "  —  " .. state, 8, y + 4, 0.95, 0.95, 0.95, 1, UIFont.Small)
         list:drawText(module.name .. "  |  " .. module.id, 8, y + 25, 0.72, 0.78, 0.82, 1, UIFont.Small)
         return y + list.itemheight
     end
@@ -218,15 +256,15 @@ function Panel:createChildren()
     self.stateLabel = ISLabel:new(rightX, 222, 20, "", 0.82, 0.86, 0.88, 1, UIFont.Small, true)
     self.stateLabel:initialise()
     self:addChild(self.stateLabel)
-    self.allowButton = ISButton:new(rightX, 264, rightWidth, 34, "Allow exact JAR", self, self.onAllow)
+    self.allowButton = ISButton:new(rightX, 264, rightWidth, 34, "Allow selected JAR", self, self.onAllow)
     self.allowButton:initialise()
     self:addChild(self.allowButton)
-    self.denyButton = ISButton:new(rightX, 306, rightWidth, 34, "Keep JAR denied", self, self.onDeny)
+    self.denyButton = ISButton:new(rightX, 306, rightWidth, 34, "Deny selected JAR", self, self.onDeny)
     self.denyButton:initialise()
     self:addChild(self.denyButton)
     self.rememberButton = ISButton:new(margin, self.height - 52, 240, 34, "[ ] Remember next choice", self, self.onToggleRemember)
     self.rememberButton:initialise()
-    self.rememberButton.tooltip = "Save the next Allow or Deny choice for this exact JAR hash across launches."
+    self.rememberButton.tooltip = "Remember only the next successfully saved Allow or Deny choice for this exact JAR hash. The toggle resets afterward."
     self:addChild(self.rememberButton)
     self.continueButton = ISButton:new(self.width - 258, self.height - 52, 240, 34, "Continue", self, self.onClose)
     self.continueButton:initialise()
@@ -237,18 +275,38 @@ function Panel:createChildren()
 
     Review.bindSelectionHandler(self.moduleList, self)
     self:refreshList()
-    self:showSelection()
 end
 
 function Panel:refreshList()
+    local selectedKey = self.selectedModule
+        and (self.selectedModule.hash .. "\t" .. self.selectedModule.id .. "\t" .. self.selectedModule.jarName)
     self.moduleList:clear()
-    for _, module in ipairs(self.modules) do
+    local selectedIndex = nil
+    for index, module in ipairs(self.modules) do
         self.moduleList:addItem(module.jarName .. " — " .. module.state, module)
+        local candidateKey = module.hash .. "\t" .. module.id .. "\t" .. module.jarName
+        if selectedKey and candidateKey == selectedKey then selectedIndex = index end
     end
-    if #self.modules > 0 and not self.selectedModule then
-        self.moduleList.selected = 1
-        self.selectedModule = self.modules[1]
+    if #self.modules > 0 then
+        selectedIndex = selectedIndex or 1
+        self.moduleList.selected = selectedIndex
+        self.selectedModule = self.modules[selectedIndex]
+    else
+        self.moduleList.selected = 0
+        self.selectedModule = nil
     end
+    self.restartRequired = Review.pendingRestartRequired(self.modules, self.pending)
+    if not self.restartRequired then self.restartConfirmRequired = false end
+    self:showSelection()
+end
+
+function Panel:syncSelection()
+    local selected = self.modules[self.moduleList.selected]
+    if selected and selected ~= self.selectedModule then
+        Review.selectModule(self, selected)
+        return true
+    end
+    return false
 end
 
 function Panel:showSelection()
@@ -263,26 +321,33 @@ function Panel:showSelection()
         self.allowButton:setEnable(false)
         self.denyButton:setEnable(false)
         self.denyButton:setTitle("Keep JAR denied")
+        self.continueButton:setTitle(self.restartRequired
+            and (self.restartConfirmRequired and "Confirm quit" or "Quit to apply changes") or "Continue")
         return
     end
-    self.detail:setName(module.jarName .. "  |  " .. module.name .. "  |  " .. module.author .. " (unverified claim)")
+    self.detail:setName("SELECTED JAR: " .. module.jarName .. "  |  " .. module.name .. "  |  " .. module.author .. " (unverified claim)")
     local hash = module.hash ~= "" and module.hash or "unavailable"
     self.hashLabel1:setName("SHA-256: " .. string.sub(hash, 1, 32))
     self.hashLabel2:setName(string.sub(hash, 33))
     self.idLabel:setName("Module ID: " .. module.id)
     self.versionLabel:setName("Version: " .. module.version)
-    self.stateLabel:setName("State: " .. module.state)
     local queued = module.hash ~= "" and self.pending[module.hash] or nil
     local queuedDecision = queued and queued.decision or nil
     local queuedMatches = queued and queued.remember == self.rememberChoices
+    local queuedDescription = queued and (string.upper(queued.decision) .. (queued.remember
+        and " remembered for this exact hash" or " once on the next launch")) or "no pending decision for this hash"
+    local stateText = "Current: " .. module.state .. "  |  Pending: " .. queuedDescription
+    if self.pendingError then stateText = stateText .. "  |  QUEUE ERROR" end
+    self.stateLabel:setName(stateText)
     local compatible = canAllow(module)
     self.allowButton:setEnable(compatible and (module.state ~= "ALLOWED" or self.rememberChoices)
         and (queuedDecision ~= "allow" or not queuedMatches))
     local hasPending = Review.hasPendingChoice(self.pending, module)
-    self.denyButton:setTitle(hasPending and "Undo pending choice" or "Keep JAR denied")
+    self.denyButton:setTitle(hasPending and "Undo pending choice" or "Deny selected JAR")
     self.denyButton:setEnable(hasPending or (validHash(module.hash) and (module.state ~= "DENIED" or self.rememberChoices)
         and (queuedDecision ~= "deny" or not queuedMatches)))
-    self.continueButton:setTitle(self.restartRequired and "Quit to restart" or "Continue")
+    self.continueButton:setTitle(self.restartRequired
+        and (self.restartConfirmRequired and "Confirm quit" or "Quit to apply changes") or "Continue")
 end
 
 function Panel:queueDecision(decision)
@@ -291,17 +356,24 @@ function Panel:queueDecision(decision)
     if decision == "allow" and not canAllow(module) then return end
     local previous = self.pending[module.hash]
     if previous and previous.decision == decision and previous.remember == self.rememberChoices then return end
-    self.pending[module.hash] = { decision = decision, remember = self.rememberChoices }
+    local rememberThisChoice = self.rememberChoices
+    self.pending[module.hash] = { decision = decision, remember = rememberThisChoice }
     local ok, reason = saveQueuedDecisions(self.pending)
     if not ok then
         self.pending[module.hash] = previous
         self.statusText = "Could not save the choice: " .. tostring(reason)
     else
-        local changesLoadedSet = Review.choiceChangesLoadedSet(module, decision)
+        local replacedInvalidQueue = self.pendingError ~= nil
+        self.pendingError = nil
+        self.rememberChoices = false
+        self.rememberButton:setTitle("[ ] Remember next choice")
+        self.restartConfirmRequired = false
         self.restartRequired = Review.pendingRestartRequired(self.modules, self.pending)
-        self.statusText = changesLoadedSet
-            and "Saved. Quit and restart Project Zomboid to apply this change."
-            or "Saved. The blocked default is unchanged; no restart is needed."
+        local scope = rememberThisChoice and "remembered, exact hash" or "one launch, exact hash"
+        local replaced = replacedInvalidQueue and " Previous invalid queued choices were replaced." or ""
+        self.statusText = string.upper(decision) .. " queued (" .. scope .. "). " .. (self.restartRequired
+            and "Quit, then restart PZ through Steam to apply."
+            or "The loaded module set is unchanged; no restart is needed.") .. replaced
     end
     self.statusLabel:setName(self.statusText)
     self:refreshList()
@@ -324,6 +396,7 @@ function Panel:onUndo()
         self.statusText = "Could not undo the choice: " .. tostring(reason)
     else
         self.restartRequired = Review.pendingRestartRequired(self.modules, self.pending)
+        self.restartConfirmRequired = false
         self.statusText = "Pending choice removed. "
             .. (self.restartRequired and "Other choices still require one restart." or "No restart is needed.")
     end
@@ -338,9 +411,16 @@ function Panel:onToggleRemember()
 end
 function Panel:onClose()
     if self.restartRequired then
+        if not self.restartConfirmRequired then
+            self.restartConfirmRequired = true
+            self.statusText = "Confirm quit: exits to desktop. Restart PZ through Steam to apply; no auto-relaunch."
+            self.statusLabel:setName(self.statusText)
+            self:showSelection()
+            return
+        end
         local ok, reason = pcall(function() getCore():quit() end)
         if not ok then
-            self.statusText = "Saved. Restart Project Zomboid to apply. " .. tostring(reason)
+            self.statusText = "Could not quit. Restart Project Zomboid manually through Steam to apply. " .. tostring(reason)
             self.statusLabel:setName(self.statusText)
         end
         return
@@ -348,6 +428,10 @@ function Panel:onClose()
     self.startupGate = false
     Review.startupGate = false
     self:setVisible(false)
+end
+
+function Review.newPanel(x, y, width, height, modules, manifestError)
+    return Panel:new(x, y, width, height, modules, manifestError)
 end
 
 local function readModules()
@@ -380,7 +464,7 @@ function Review.open()
     local core = getCore()
     local bounds = Review.layout(core:getScreenWidth(), core:getScreenHeight(), Review.startupGate)
     local modules, manifestError = readModules()
-    local panel = Panel:new(bounds.x, bounds.y, bounds.width, bounds.height, modules, manifestError)
+    local panel = Review.newPanel(bounds.x, bounds.y, bounds.width, bounds.height, modules, manifestError)
     screen:addChild(panel)
     screen[PANEL_KEY] = panel
     panel:setVisible(true)
@@ -418,6 +502,9 @@ end
 
 local function update()
     Review.ensureButton()
+    local screen = MainScreen and MainScreen.instance or nil
+    local panel = screen and screen[PANEL_KEY] or nil
+    if panel and panel:getIsVisible() then panel:syncSelection() end
     if Review.autoPending and Review.open() then Review.autoPending = false end
 end
 

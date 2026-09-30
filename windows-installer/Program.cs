@@ -388,7 +388,7 @@ internal static class Program
             using var output = new MemoryStream();
             using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
             {
-                var agentName = "knoxbridge-agent-0.1.0-alpha9.jar";
+                var agentName = "knoxbridge-agent-0.1.0-alpha10.jar";
                 AddEntry(archive, agentName, agent);
                 var agentHash = Convert.ToHexString(SHA256.HashData(corruptChecksum ? new byte[] { 0 } : agent)).ToLowerInvariant();
                 AddEntry(archive, agentName + ".sha256", Encoding.ASCII.GetBytes(agentHash + "  " + agentName + "\n"));

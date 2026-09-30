@@ -14,7 +14,7 @@ import java.lang.management.ManagementFactory;
 /** Early JVM bootstrap and PZ-specific adapter owner. */
 public final class KnoxBridgeAgent {
     private static final String VERSION = KnoxBridgeAgent.class.getPackage().getImplementationVersion() == null
-        ? "0.1.0-alpha9" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
+        ? "0.1.0-alpha10" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
     private static final AtomicBoolean STARTED = new AtomicBoolean();
     private static final AtomicBoolean MODULES_STARTED = new AtomicBoolean();
     private static final List<ModuleLoader.LoadedModule> LOADED = new CopyOnWriteArrayList<>();
@@ -171,6 +171,8 @@ public final class KnoxBridgeAgent {
                 reviewEntries.add(ModuleReviewFiles.entry(candidate, "", "LOAD FAILED"));
             }
         }
+        try { trust.finishLaunch(); }
+        catch (Exception e) { log.write("module one-time trust cleanup failed reason=" + e + "; a queued one-time choice may be retried next launch"); }
         try { ModuleReviewFiles.writeManifest(ModuleReviewFiles.manifestPath(), reviewEntries); }
         catch (Exception e) { log.write("module review manifest failed reason=" + e + "; in-game module review unavailable"); }
         retransformRegisteredTargets();

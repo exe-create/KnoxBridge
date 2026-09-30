@@ -70,8 +70,11 @@ public final class RuntimeVerifier {
                 + ModuleReviewFiles.DECISIONS_COMMIT + "\n");
         ModuleReviewFiles.applyQueuedDecisions(reviewTrust, queue, s -> { });
         check(reviewTrust.check(oneTimeHash) == TrustStore.Decision.ALLOW_ONCE
-                && reviewTrust.check(oneTimeHash) == TrustStore.Decision.APPROVAL_REQUIRED,
-            "unchecked remember option grants an exact-hash approval for one launch only");
+                && reviewTrust.check(oneTimeHash) == TrustStore.Decision.ALLOW_ONCE,
+            "unchecked remember option applies to every same-hash candidate during one launch");
+        reviewTrust.finishLaunch();
+        check(reviewTrust.check(oneTimeHash) == TrustStore.Decision.APPROVAL_REQUIRED,
+            "unchecked remember option expires when one launch finishes");
         String rememberedDenyHash = "4".repeat(64);
         Files.writeString(queue, ModuleReviewFiles.DECISIONS_HEADER + "\n" + rememberedDenyHash + "\tdeny\tremember\n"
                 + ModuleReviewFiles.DECISIONS_COMMIT + "\n");
@@ -95,11 +98,26 @@ public final class RuntimeVerifier {
         check(trust.check(hash) == TrustStore.Decision.APPROVAL_REQUIRED, "unknown jar requires approval");
         trust.decide(hash, TrustStore.Decision.ALLOW_ONCE);
         check(trust.check(hash) == TrustStore.Decision.ALLOW_ONCE, "allow once");
-        check(trust.check(hash) == TrustStore.Decision.APPROVAL_REQUIRED, "allow once expires after one check");
+        check(trust.check(hash) == TrustStore.Decision.ALLOW_ONCE, "one-time allow remains effective for repeated hash checks in the same launch");
+        trust.finishLaunch();
+        check(trust.check(hash) == TrustStore.Decision.APPROVAL_REQUIRED, "one-time allow expires after the launch finishes");
         trust.decide(hash, TrustStore.Decision.DENY_ONCE);
         check(trust.check(hash) == TrustStore.Decision.DENY_ONCE, "deny once");
+        check(trust.check(hash) == TrustStore.Decision.DENY_ONCE, "one-time deny remains effective for repeated hash checks in the same launch");
+        trust.finishLaunch();
+        check(trust.check(hash) == TrustStore.Decision.APPROVAL_REQUIRED, "one-time deny expires after the launch finishes");
         trust.decide(hash, TrustStore.Decision.ALLOW_EXACT);
         check(trust.check(hash) == TrustStore.Decision.ALLOW_EXACT, "persistent exact hash approval");
+        trust.decideNextLaunch(hash, TrustStore.Decision.DENY_ONCE);
+        check(trust.check(hash) == TrustStore.Decision.DENY_ONCE, "one-time deny overrides remembered allow for this launch");
+        check(trust.check(hash) == TrustStore.Decision.DENY_ONCE, "one-time override applies to each same-hash candidate in the launch");
+        trust.finishLaunch();
+        check(trust.check(hash) == TrustStore.Decision.ALLOW_EXACT, "one-time deny leaves remembered allow intact afterward");
+        trust.decide(hash, TrustStore.Decision.DENY_EXACT);
+        trust.decideNextLaunch(hash, TrustStore.Decision.ALLOW_ONCE);
+        check(trust.check(hash) == TrustStore.Decision.ALLOW_ONCE, "one-time allow overrides remembered deny for this launch");
+        trust.finishLaunch();
+        check(trust.check(hash) == TrustStore.Decision.DENY_EXACT, "one-time allow leaves remembered deny intact afterward");
         String changedHash = "0".repeat(64);
         check(trust.check(changedHash) == TrustStore.Decision.APPROVAL_REQUIRED, "changed hash requires approval");
         trust.decide(changedHash, TrustStore.Decision.DENY_EXACT);
@@ -109,8 +127,18 @@ public final class RuntimeVerifier {
             "trust metadata records module identity");
         trust.decideNextLaunch(changedHash, TrustStore.Decision.ALLOW_ONCE);
         TrustStore nextRun = new TrustStore(temp.resolve("trust.properties"));
-        check(nextRun.check(changedHash) == TrustStore.Decision.ALLOW_ONCE, "queued allow-once decision");
-        check(nextRun.check(changedHash) == TrustStore.Decision.APPROVAL_REQUIRED, "queued one-time approval consumed");
+        TrustStore.Decision queuedDecision = nextRun.check(changedHash);
+        check(queuedDecision == TrustStore.Decision.ALLOW_ONCE,
+            "queued allow-once decision actual=" + queuedDecision + " file=" + Files.readString(temp.resolve("trust.properties")));
+        check(nextRun.check(changedHash) == TrustStore.Decision.ALLOW_ONCE, "queued one-time decision covers repeated same-hash checks");
+        nextRun.finishLaunch();
+        check(nextRun.check(changedHash) == TrustStore.Decision.DENY_EXACT, "queued one-time allow preserves the remembered deny after launch");
+        Path legacyTrustPath = temp.resolve("legacy-trust.properties");
+        Files.writeString(legacyTrustPath, hash + "=allow-once\n");
+        TrustStore legacyTrust = new TrustStore(legacyTrustPath);
+        check(legacyTrust.check(hash) == TrustStore.Decision.ALLOW_ONCE, "alpha9 one-time trust entry migrates for this launch");
+        legacyTrust.finishLaunch();
+        check(legacyTrust.check(hash) == TrustStore.Decision.APPROVAL_REQUIRED, "migrated one-time trust does not persist");
 
         List<String> moduleLog = new ArrayList<>();
         PatchEngine modulePatches = new PatchEngine(moduleLog::add);
@@ -118,33 +146,132 @@ public final class RuntimeVerifier {
                 candidates.get(0).descriptor().jar(), "test-runtime", modulePatches, null, moduleLog::add)) {
             check(moduleLog.stream().anyMatch(s -> s.contains("independent example module ready")), "independent module entrypoint");
             check(moduleLog.stream().anyMatch(s -> s.contains("patch registered module=org.example.knoxbridge.greeting")), "module patch API registration");
+            byte[] greetingBytes;
+            try (var input = loaded.loader().getResourceAsStream("org/example/knoxbridge/GreetingFixture.class")) {
+                if (input == null) throw new AssertionError("example greeting fixture is missing from module JAR");
+                greetingBytes = input.readAllBytes();
+            }
+            byte[] patchedBytes = modulePatches.transform(loaded.loader(), "org/example/knoxbridge/GreetingFixture", null, null, greetingBytes);
+            check(patchedBytes != null && moduleLog.stream().anyMatch(s -> s.contains("patch PASS module=org.example.knoxbridge.greeting")),
+                "fixture patch transforms its exact registered target");
+            Class<?> patchedType = new ByteArrayClassLoader(loaded.loader()).define("org.example.knoxbridge.GreetingFixture", patchedBytes);
+            Object patchedFixture = patchedType.getConstructor().newInstance();
+            check(patchedType.getMethod("greeting").invoke(patchedFixture)
+                    .equals("hello from an independently patched KnoxBridge fixture"),
+                "transformed fixture has observable behavior");
+        }
+
+        Path authorModRoot = Files.createDirectories(temp.resolve("author-module"));
+        Path authorJar = Path.of(System.getProperty("knoxbridge.authorExampleJar"));
+        Path authorModuleJar = authorModRoot.resolve("media/java/minimal-module.jar");
+        Files.createDirectories(authorModuleJar.getParent());
+        Files.copy(authorJar, authorModuleJar);
+        Files.writeString(authorModRoot.resolve("knoxbridge.properties"),
+            "id=org.example.mymod\nversion=1.0.0\napiVersion=1\nentrypoint=org.example.mymod.MyModule\n"
+                + "jar=media/java/minimal-module.jar\nclassLoader=isolated\n");
+        ModuleDescriptor authorDescriptor = ModuleDescriptor.read(authorModRoot);
+        List<String> authorLog = new ArrayList<>();
+        PatchEngine authorPatches = new PatchEngine(authorLog::add);
+        try (ModuleLoader.LoadedModule loaded = ModuleLoader.load(authorDescriptor, authorModuleJar,
+                "test-runtime", authorPatches, null, authorLog::add)) {
+            byte[] greetingBytes;
+            try (var input = loaded.loader().getResourceAsStream("org/example/mymod/ExampleGreeting.class")) {
+                if (input == null) throw new AssertionError("author example fixture is missing from module JAR");
+                greetingBytes = input.readAllBytes();
+            }
+            byte[] patchedBytes = authorPatches.transform(loaded.loader(), "org/example/mymod/ExampleGreeting",
+                null, null, greetingBytes);
+            check(patchedBytes != null, "standalone author patch transforms its exact fixture target");
+            Class<?> patchedType = new ByteArrayClassLoader(loaded.loader()).define("org.example.mymod.ExampleGreeting", patchedBytes);
+            Object patchedFixture = patchedType.getConstructor().newInstance();
+            check(patchedType.getMethod("greeting").invoke(patchedFixture).equals("greeting changed by a KnoxBridge patch"),
+                "standalone author patch produces observable behavior");
+            check(authorLog.stream().anyMatch(s -> s.contains("patch PASS module=org.example.mymod")
+                && s.contains("methodName=greeting") && s.contains("descriptor=()Ljava/lang/String;")),
+                "author patch diagnostic reports exact target");
         }
 
         List<String> patchLog = new ArrayList<>();
         PatchEngine patches = new PatchEngine(patchLog::add);
         Path logTarget = temp.resolve("fixture.class");
-        patches.module("verifier");
-        patches.register(new com.knoxbridge.api.PatchRegistrar.Patch("probe",
+        registerPatch(patches, "verifier", new com.knoxbridge.api.PatchRegistrar.Patch("probe",
             new com.knoxbridge.api.PatchRegistrar.Target("fixture.Target", "run", "()V"), false,
             (name, bytes) -> { Files.writeString(logTarget, name); return bytes.clone(); }));
         byte[] classFile = Files.readAllBytes(Path.of(RuntimeVerifier.class.getResource("RuntimeVerifier.class").toURI()));
         check(patches.transform(null, "fixture/Target", null, null, classFile) == null, "mismatched class does not run transformer");
         check(!Files.exists(logTarget), "mismatched target ignored");
         check(ClassFileMethods.descriptors(classFile, "main").size() == 1, "exact method descriptor discovery");
-        patches.module("verifier-exact");
         boolean[] exactCallback = {false};
-        patches.register(new com.knoxbridge.api.PatchRegistrar.Patch("exact-main",
+        registerPatch(patches, "verifier-exact", new com.knoxbridge.api.PatchRegistrar.Patch("exact-main",
             new com.knoxbridge.api.PatchRegistrar.Target("com.knoxbridge.runtime.RuntimeVerifier", "main", "([Ljava/lang/String;)V"), false,
             (name, bytes) -> { exactCallback[0] = true; return bytes.clone(); }));
         check(patches.transform(null, "com/knoxbridge/runtime/RuntimeVerifier", null, null, classFile) == null && exactCallback[0],
             "exact class and method target invokes transformer");
-        patches.module("verifier-bad-bytes");
-        patches.register(new com.knoxbridge.api.PatchRegistrar.Patch("bad-bytes",
+        registerPatch(patches, "verifier-bad-bytes", new com.knoxbridge.api.PatchRegistrar.Patch("bad-bytes",
             new com.knoxbridge.api.PatchRegistrar.Target("com.knoxbridge.runtime.RuntimeVerifier", "check", "(ZLjava/lang/String;)V"), false,
             (name, bytes) -> new byte[] {1, 2, 3}));
         check(patches.transform(null, "com/knoxbridge/runtime/RuntimeVerifier", null, null, classFile) == null
                 && patchLog.stream().anyMatch(s -> s.contains("patch FAIL module=verifier-bad-bytes")),
             "invalid transformer output is rejected and attributed");
+        com.knoxbridge.api.PatchRegistrar expiredRegistrar;
+        try (PatchEngine.Registration scope = patches.beginModule("verifier-closed")) {
+            scope.register(new com.knoxbridge.api.PatchRegistrar.Patch("closed-scope",
+                new com.knoxbridge.api.PatchRegistrar.Target("fixture.Closed", "run", "()V"), false, (name, bytes) -> bytes));
+            scope.commit();
+            expiredRegistrar = scope;
+        }
+        boolean lateRegistrationRejected = false;
+        try {
+            expiredRegistrar.register(new com.knoxbridge.api.PatchRegistrar.Patch("late-patch",
+                new com.knoxbridge.api.PatchRegistrar.Target("fixture.Late", "run", "()V"), false, (name, bytes) -> bytes));
+        } catch (IllegalStateException expectedFailure) { lateRegistrationRejected = true; }
+        check(lateRegistrationRejected, "patch registration closes when module initialization ends");
+        boolean[] asyncRegistrationRejected = {false};
+        try (PatchEngine.Registration synchronousOnly = patches.beginModule("verifier-async")) {
+            Thread asynchronous = new Thread(() -> {
+                try {
+                    synchronousOnly.register(new com.knoxbridge.api.PatchRegistrar.Patch("async-patch",
+                        new com.knoxbridge.api.PatchRegistrar.Target("fixture.Async", "run", "()V"), false,
+                        (name, bytes) -> bytes));
+                } catch (IllegalStateException expectedFailure) { asyncRegistrationRejected[0] = true; }
+            });
+            asynchronous.start();
+            asynchronous.join();
+            synchronousOnly.commit();
+        }
+        check(asyncRegistrationRejected[0], "asynchronous patch registration is rejected");
+        boolean[] rolledBackTransformer = {false};
+        try (PatchEngine.Registration abandoned = patches.beginModule("verifier-abandoned")) {
+            abandoned.register(new com.knoxbridge.api.PatchRegistrar.Patch("abandoned-patch",
+                new com.knoxbridge.api.PatchRegistrar.Target("fixture.Abandoned", "run", "()V"), false,
+                (name, bytes) -> { rolledBackTransformer[0] = true; return bytes; }));
+        }
+        check(patches.transform(null, "fixture/Abandoned", null, null, classFile) == null && !rolledBackTransformer[0],
+            "uncommitted module patch registrations are discarded");
+        boolean duplicateRejected = false;
+        try (PatchEngine.Registration duplicateScope = patches.beginModule("verifier-duplicate")) {
+            duplicateScope.register(new com.knoxbridge.api.PatchRegistrar.Patch("probe",
+                new com.knoxbridge.api.PatchRegistrar.Target("fixture.Other", "run", "()V"), false, (name, bytes) -> bytes));
+            duplicateScope.commit();
+        } catch (IllegalArgumentException expectedFailure) { duplicateRejected = true; }
+        check(duplicateRejected, "duplicate patch IDs are rejected across module scopes");
+        boolean[] ambiguousCallback = {false};
+        registerPatch(patches, "verifier-ambiguous", new com.knoxbridge.api.PatchRegistrar.Patch("ambiguous",
+            new com.knoxbridge.api.PatchRegistrar.Target("com.knoxbridge.runtime.RuntimeVerifier$OverloadedFixture", "target", null),
+            false, (name, bytes) -> { ambiguousCallback[0] = true; return bytes.clone(); }));
+        byte[] overloadedBytes = Files.readAllBytes(Path.of(RuntimeVerifier.class.getResource("RuntimeVerifier$OverloadedFixture.class").toURI()));
+        check(patches.transform(null, "com/knoxbridge/runtime/RuntimeVerifier$OverloadedFixture", null, null, overloadedBytes) == null
+                && !ambiguousCallback[0]
+                && patchLog.stream().anyMatch(s -> s.contains("reason=ambiguous-method") && s.contains("target=Target")),
+            "overloaded target without descriptor is rejected with target diagnostic");
+        boolean[] missingMethodCallback = {false};
+        registerPatch(patches, "verifier-missing", new com.knoxbridge.api.PatchRegistrar.Patch("missing-method",
+            new com.knoxbridge.api.PatchRegistrar.Target("com.knoxbridge.runtime.RuntimeVerifier", "notPresent", "()V"),
+            false, (name, bytes) -> { missingMethodCallback[0] = true; return bytes; }));
+        check(patches.transform(null, "com/knoxbridge/runtime/RuntimeVerifier", null, null, classFile) == null
+                && !missingMethodCallback[0]
+                && patchLog.stream().anyMatch(s -> s.contains("reason=method-missing") && s.contains("descriptor=()V")),
+            "missing method target is rejected with exact-target diagnostic");
         ArrayList<String> implementations = new ArrayList<>();
         implementations.add("enabled");
         SignatureFixture fixture = new SignatureFixture();
@@ -192,8 +319,25 @@ public final class RuntimeVerifier {
         if (!ok) throw new AssertionError(name);
     }
 
+    private static void registerPatch(PatchEngine engine, String moduleId, com.knoxbridge.api.PatchRegistrar.Patch patch) {
+        try (PatchEngine.Registration registration = engine.beginModule(moduleId)) {
+            registration.register(patch);
+            registration.commit();
+        }
+    }
+
+    private static final class ByteArrayClassLoader extends ClassLoader {
+        ByteArrayClassLoader(ClassLoader parent) { super(parent); }
+        Class<?> define(String name, byte[] bytes) { return defineClass(name, bytes, 0, bytes.length); }
+    }
+
     private static final class SignatureFixture {
         void loadMods(List<String> mods) { if (mods.isEmpty()) throw new IllegalArgumentException(); }
+    }
+
+    private static final class OverloadedFixture {
+        void target() { }
+        void target(String value) { }
     }
 
     public static final class FakeFileSystem {

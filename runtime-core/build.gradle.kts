@@ -3,6 +3,7 @@ plugins { java }
 dependencies {
     implementation(project(":runtime-api"))
     implementation("org.ow2.asm:asm:9.10.1")
+    implementation("org.ow2.asm:asm-tree:9.10.1")
 }
 
 tasks.jar {
@@ -26,10 +27,11 @@ tasks.jar {
 
 tasks.register<JavaExec>("verifyRuntime") {
     group = "verification"
-    dependsOn(tasks.testClasses, ":test-module:jar")
+    dependsOn(tasks.testClasses, ":test-module:jar", ":examples:minimal-module:jar")
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("com.knoxbridge.runtime.RuntimeVerifier")
     systemProperty("knoxbridge.testModuleJar", project(":test-module").layout.buildDirectory.file("libs/knoxbridge-example-module-${project.version}.jar").get().asFile.absolutePath)
+    systemProperty("knoxbridge.authorExampleJar", project(":examples:minimal-module").layout.buildDirectory.file("libs/minimal-module.jar").get().asFile.absolutePath)
 }
 
 tasks.register<JavaExec>("verifyPzApi") {

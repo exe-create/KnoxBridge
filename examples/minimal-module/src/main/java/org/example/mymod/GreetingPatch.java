@@ -1,8 +1,5 @@
-package org.example.knoxbridge;
+package org.example.mymod;
 
-import com.knoxbridge.api.KnoxModule;
-import com.knoxbridge.api.ModuleContext;
-import com.knoxbridge.api.PatchRegistrar;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -12,25 +9,18 @@ import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
-public final class ExampleModule implements KnoxModule {
-    @Override public void initialize(ModuleContext context) {
-        context.logger().accept("independent example module ready id=" + context.moduleId());
-        context.patches().register(new PatchRegistrar.Patch(
-            "example.greeting-probe",
-            new PatchRegistrar.Target("org.example.knoxbridge.GreetingFixture", "greeting", "()Ljava/lang/String;"),
-            false,
-            ExampleModule::replaceGreeting
-        ));
-    }
+/** Replaces one exact fixture method body using ASM. */
+final class GreetingPatch {
+    private GreetingPatch() { }
 
-    private static byte[] replaceGreeting(String className, byte[] originalBytes) {
+    static byte[] replaceGreeting(String className, byte[] originalBytes) {
         ClassNode type = new ClassNode(Opcodes.ASM9);
         new ClassReader(originalBytes).accept(type, 0);
         MethodNode method = type.methods.stream()
             .filter(candidate -> candidate.name.equals("greeting") && candidate.desc.equals("()Ljava/lang/String;"))
             .findFirst().orElseThrow(() -> new IllegalArgumentException("fixture greeting method is missing"));
         InsnList replacement = new InsnList();
-        replacement.add(new LdcInsnNode("hello from an independently patched KnoxBridge fixture"));
+        replacement.add(new LdcInsnNode("greeting changed by a KnoxBridge patch"));
         replacement.add(new InsnNode(Opcodes.ARETURN));
         method.instructions = replacement;
         method.tryCatchBlocks.clear();

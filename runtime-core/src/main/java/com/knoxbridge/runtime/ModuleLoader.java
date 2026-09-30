@@ -27,15 +27,17 @@ final class ModuleLoader {
             Class<?> type = Class.forName(d.entrypoint(), true, classLoader);
             if (!KnoxModule.class.isAssignableFrom(type)) throw new IllegalArgumentException("entrypoint does not implement KnoxModule");
             KnoxModule module = (KnoxModule) type.getDeclaredConstructor().newInstance();
-            patches.module(d.id());
-            module.initialize(new ModuleContext() {
-                public String runtimeVersion() { return runtimeVersion; }
-                public String moduleId() { return d.id(); }
-                public String moduleVersion() { return d.version(); }
-                public Consumer<String> logger() { return log; }
-                public com.knoxbridge.api.PatchRegistrar patches() { return patches; }
-                public Instrumentation instrumentation() { return instrumentation; }
-            });
+            try (PatchEngine.Registration patchRegistration = patches.beginModule(d.id())) {
+                module.initialize(new ModuleContext() {
+                    public String runtimeVersion() { return runtimeVersion; }
+                    public String moduleId() { return d.id(); }
+                    public String moduleVersion() { return d.version(); }
+                    public Consumer<String> logger() { return log; }
+                    public com.knoxbridge.api.PatchRegistrar patches() { return patchRegistration; }
+                    public Instrumentation instrumentation() { return instrumentation; }
+                });
+                patchRegistration.commit();
+            }
             log.accept("module loaded id=" + d.id() + " version=" + d.version());
             return new LoadedModule(module, isolatedLoader, systemJar);
         } catch (Exception | Error e) {

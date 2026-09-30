@@ -8,7 +8,7 @@ import shutil
 import sys
 
 APP_ID = "108600"
-VERSION = "0.1.0-alpha9"
+VERSION = "0.1.0-alpha10"
 BASE = Path.home() / ".knoxbridge"
 STATE = BASE / "install-state.json"
 BACKUP = BASE / "steam-localconfig.vdf.original"

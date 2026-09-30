@@ -1,6 +1,7 @@
 package com.knoxbridge.api;
 
 public interface PatchRegistrar {
+    /** Registers a patch during synchronous {@link KnoxModule#initialize(ModuleContext)} execution. */
     void register(Patch patch);
 
     @FunctionalInterface
@@ -8,6 +9,9 @@ public interface PatchRegistrar {
         byte[] transform(String className, byte[] originalBytes) throws Exception;
     }
 
+    /**
+     * @param required diagnostic metadata only; current runtimes do not block a module or PZ when it fails
+     */
     record Patch(String patchId, Target target, boolean required, Transformer transformer) {
         public Patch {
             if (patchId == null || patchId.isBlank()) throw new IllegalArgumentException("patchId is required");

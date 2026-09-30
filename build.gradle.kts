@@ -2,7 +2,7 @@ plugins { base }
 
 allprojects {
     group = "com.knoxbridge"
-    version = "0.1.0-alpha9"
+    version = "0.1.0-alpha10"
     repositories { mavenCentral() }
 }
 
@@ -19,7 +19,8 @@ subprojects {
 }
 
 tasks.register("verify") {
-    dependsOn(":runtime-core:verifyRuntime", ":runtime-core:jar", ":bootstrap-smoke:jar", "stageExampleMod", "writeChecksums")
+    dependsOn(":runtime-core:verifyRuntime", ":runtime-core:jar", ":bootstrap-smoke:jar",
+        ":examples:minimal-module:stagePzMod", "stageExampleMod", "writeChecksums")
     if (System.getProperty("os.name").lowercase().contains("windows")) dependsOn("buildWindowsBootstrap")
 }
 
@@ -73,7 +74,7 @@ val writeChecksums by tasks.registering {
 }
 
 tasks.register<Zip>("packageRuntime") {
-    dependsOn("verify", "stageExampleMod", "writeChecksums")
+    dependsOn("verify", "stageExampleMod", "writeChecksums", ":examples:minimal-module:stagePzMod")
     if (System.getProperty("os.name").lowercase().contains("windows")) dependsOn("buildWindowsBootstrap")
     archiveBaseName.set("knoxbridge-runtime")
     archiveVersion.set(project.version.toString())
@@ -82,6 +83,13 @@ tasks.register<Zip>("packageRuntime") {
     from(project(":runtime-api").layout.buildDirectory.dir("libs")) { include("runtime-api-${project.version}.jar*") }
     from(project(":test-module").layout.buildDirectory.dir("libs")) { include("knoxbridge-example-module-${project.version}.jar*") }
     from(layout.buildDirectory.dir("staged-example")) { into("example-mod") }
+    from(project(":examples:minimal-module").layout.buildDirectory.dir("libs")) {
+        include("minimal-module.jar")
+        into("examples/minimal-module")
+    }
+    from(project(":examples:minimal-module").layout.buildDirectory.dir("staged-mod")) {
+        into("examples/pz-mod")
+    }
     from("examples/minimal-module") {
         include("build.gradle.kts", "settings.gradle.kts", "knoxbridge.properties", "mod.info", "src/main/java/**/*.java")
         into("examples/minimal-module")

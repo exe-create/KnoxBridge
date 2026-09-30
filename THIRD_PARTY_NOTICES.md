@@ -2,7 +2,7 @@
 
 ## ASM 9.10.1
 
-KnoxBridge Runtime bundles ASM (`org.ow2.asm:asm:9.10.1`) for its narrow PZ enabled-mod callback transformer.
+KnoxBridge Runtime bundles ASM Core and Tree (`org.ow2.asm:asm:9.10.1`, `org.ow2.asm:asm-tree:9.10.1`) in the agent for bytecode transformation and the supported author patch toolkit. The author example compiles against this pinned dependency as `compileOnly`; the example module JAR does not redistribute ASM classes.
 
 ```text
 ASM: a very small and fast Java bytecode manipulation framework
