@@ -1,7 +1,7 @@
 require "ISUI/ISButton"
 
 local SupportButton = {}
-local SUPPORT_URL = "https://ko-fi.com/drganja"
+local SUPPORT_URL = "https://ko-fi.com/drganja/goal?g=1"
 local LABEL = "Buy Me A Coffee!"
 local ICON = "media/ui/knoxKofi.png"
 local BUTTON_KEY = "knoxBridgeSupportButton"
