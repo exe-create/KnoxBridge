@@ -80,4 +80,5 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Require a second explicit confirmation before the UI quits PZ for a load-set change, and tell the player to relaunch through Steam. Automatic Steam/game relaunch is not implemented.
 - Reject malformed/conflicting decision queues as a whole in the Lua UI, matching Java's fail-closed importer; surface queue and write-close errors.
 - Expand offline UI/runtime fixtures for remember reset, selected-item synchronization, invalid queue rejection, quit confirmation, persistent trust restoration, and one-time same-hash reuse. Live Build 42 behavior remains unverified.
+- Linux/macOS setup no longer needs Python: copy the agent JAR to `~/.knoxbridge/` and paste one `-javaagent` line into Steam Launch Options. Player docs rewritten around one unified flow on every OS.
 - The current Workshop review gate, trust handoff, packaged alpha10 runtime, live PZ module patches, and Linux/macOS launch paths have not been live-verified for this candidate. No release or compatibility claim is made.
