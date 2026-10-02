@@ -12,7 +12,7 @@ KnoxBridge is an independently built Java-mod runtime for Project Zomboid. Knox 
 
 ## Player essentials
 
-Subscribe to the KnoxBridge Runtime Workshop dependency, then separately download the player setup package from [GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest). The Workshop item supplies the PZ dependency marker and in-game review UI; it does **not** install or activate the Java runtime. The API JAR in Workshop is for compiling modules, not for player runtime use.
+Subscribe to the KnoxBridge Runtime Workshop dependency, then separately download the player setup package from [GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest). Windows players run `KnoxBridgeSetup.exe`; Linux/macOS players copy one JAR and paste one line into Steam Launch Options — no Python needed. The Workshop item supplies the PZ dependency marker and in-game review UI; it does **not** install or activate the Java runtime. The API JAR in Workshop is for compiling modules, not for player runtime use.
 
 Unknown or changed module JAR hashes are blocked by default. Approved Java modules run with the same permissions as the game user; KnoxBridge is not a sandbox. A changed module set requires the player to confirm quitting, then relaunch PZ through Steam; it does not auto-relaunch. The current review UI and Java/Lua trust handoff still need live PZ acceptance. Linux/macOS setup and runtime are not live-verified. See [installation](docs/INSTALLATION.md) for platform-specific steps and [compatibility](docs/COMPATIBILITY.md) for the evidence boundary.
 

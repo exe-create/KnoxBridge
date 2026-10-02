@@ -4,6 +4,17 @@
 
 KnoxBridge has a Steam Workshop dependency marker and a separate player setup download. The Workshop item carries PZ metadata, the compile-time API JAR, and concise player/mod-author guides; it does not install or activate the runtime. Download player setup from [KnoxBridge GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest). The separate Knox Survivors Launcher is deprecated and unsupported. Do not download or use its old releases, or combine it or a direct legacy Knox agent with KnoxBridge.
 
+## Same steps on every OS
+
+Installing KnoxBridge is the same four steps everywhere; only the last step's tool differs by OS:
+
+1. Subscribe to KnoxBridge Runtime (and Knox Survivors if you play it) and wait for Steam downloads to finish.
+2. Download the player setup from GitHub Releases.
+3. Point Project Zomboid at the KnoxBridge runtime (Windows: run the setup EXE; Linux/macOS: paste one line into Steam Launch Options — details below).
+4. Enable the mods in the PZ Mods menu, start through Steam, and approve the exact JAR hash in the main-menu review screen. Unknown or changed JARs stay blocked until you allow them.
+
+No Java, .NET, or Python install is required on any OS: the runtime uses Project Zomboid's bundled Java.
+
 ## Windows
 
 1. Subscribe to KnoxBridge Runtime and Knox Survivors, and wait for Steam downloads to finish.
@@ -18,18 +29,20 @@ The Windows installer is unsigned. Windows may show an **Unknown publisher** or 
 
 ## Linux and macOS
 
-The release includes a Unix setup helper. It uses Python 3 from the standard library and modifies only Project Zomboid's `LaunchOptions` entry in your Steam `localconfig.vdf`.
+No Python, terminal scripting, or Steam config editing is required. You copy one file and paste one line into Steam's own Launch Options box.
 
 1. Subscribe to KnoxBridge Runtime and Knox Survivors, and wait for Steam downloads to finish.
 2. Download and extract `KnoxBridgeRuntime-*.zip` from GitHub Releases.
-3. Close Steam, open a terminal in the extracted folder, and run `sh scripts/setup-unix.sh`.
-4. Choose **1** to install/update. If setup asks for a `localconfig.vdf` path, select the one under your Steam `userdata/<account>/config/` directory.
-5. Reopen Steam, enable **KnoxBridge Runtime** and Knox Survivors in the PZ Mods menu, and start normally.
-6. At the PZ main menu, review enabled-mod JARs in the full-screen gate before entering a world. Unknown JARs remain blocked unless allowed. Leave **Remember next choice** unchecked for one launch or check it to remember the next exact-hash choice; the toggle resets after that saved choice. A one-launch choice temporarily overrides any previous remembered decision, which returns after that launch. If you change a queued decision before continuing, use **Undo pending choice**. If choices change which modules load, the gate asks for confirmation before quitting; then start PZ again through Steam. KnoxBridge does not automatically relaunch the game. If the file bridge cannot be used, leave the module blocked and report the problem.
+3. Copy `knoxbridge-agent-*.jar` from the extracted archive into a new folder called `.knoxbridge` in your home directory, so the path is `~/.knoxbridge/knoxbridge-agent-*.jar` (use the exact versioned filename from your download).
+4. In Steam, right-click Project Zomboid → Properties → Launch Options, and append this text after anything already there (keep existing text; the trailing `--` is mandatory):
+   `-javaagent:"$HOME/.knoxbridge/knoxbridge-agent-0.1.0-alpha10.jar" --`
+   Replace the version with the one you downloaded if it differs.
+5. Enable **KnoxBridge Runtime** and Knox Survivors in the PZ Mods menu, and start normally through Steam.
+6. At the PZ main menu, review enabled-mod JARs in the full-screen gate before entering a world. Unknown JARs remain blocked unless allowed. Leave **Remember next choice** unchecked for a one-launch decision or check it to remember the next exact-hash choice; the toggle resets after that saved choice. If you change a queued decision before continuing, use **Undo pending choice**. If choices change which modules load, the gate asks for confirmation before quitting; then start PZ again through Steam. KnoxBridge does not automatically relaunch the game. If the file bridge cannot be used, leave the module blocked and report the problem.
 
-The helper backs up the exact Steam config before its first edit, records the installed hash, preserves other launch options, and removes only its own option if Steam settings change later. Choose **2** to uninstall. Do not run the helper while Steam is open; Steam can overwrite its local config while running.
+To uninstall, remove the pasted text from Launch Options and delete the JAR from `~/.knoxbridge/`. A legacy `scripts/setup-unix.sh` helper (Python 3) is still included in the archive as an alternative, but it is no longer the recommended path.
 
-Linux/macOS continue to use the `KnoxBridgeRuntime-*.zip` archive and `scripts/setup-unix.sh`; Python 3 is required for the Steam config helper. This path has **not** been live-tested on those operating systems and is not yet a one-file installer. The runtime itself uses Project Zomboid's bundled Java on every platform, so KnoxBridge does not require players to install Java separately. The proven live path remains Windows x64 on PZ 42.21.0. Keep a copy of your Steam config and avoid important saves while testing this alpha.
+This manual path has **not** been live-tested on Linux/macOS and is not yet a one-file installer. The runtime itself uses Project Zomboid's bundled Java on every platform, so KnoxBridge does not require players to install Java separately. The proven live path remains Windows x64 on PZ 42.21.0. Keep a copy of your Steam config and avoid important saves while testing this alpha.
 
 ## Trust and safety
 
