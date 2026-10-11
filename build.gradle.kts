@@ -2,7 +2,7 @@ plugins { base }
 
 allprojects {
     group = "com.knoxbridge"
-    version = "0.1.0-alpha10"
+    version = "0.1.0-alpha11"
     repositories { mavenCentral() }
 }
 
@@ -98,9 +98,11 @@ tasks.register<Zip>("packageRuntime") {
     from("KnoxBridge Setup.cmd")
     from(layout.projectDirectory.file("bootstrap-windows/build/knoxbridge-bootstrap.dll")) { into("bootstrap-windows") }
     from(layout.projectDirectory.file("bootstrap-windows/build/knoxbridge-bootstrap.dll.sha256")) { into("bootstrap-windows") }
+    from(layout.projectDirectory.file("bootstrap-windows/build/knoxbridge-bootstrap.dll.knoxsig")) { into("bootstrap-windows") }
     from("bootstrap-windows/src/knoxbridge_bootstrap.cpp") { into("bootstrap-windows/src") }
     from("bootstrap-windows/README.md") { into("bootstrap-windows") }
     from("docs") { into("docs") }
+    from("security") { include("publisher-public.der", "PUBLISHER.md"); into("security") }
     from("THIRD_PARTY_NOTICES.md")
     from("LICENSE")
     from("README.md")
@@ -115,7 +117,7 @@ tasks.register<Zip>("packageManualInstaller") {
     archiveVersion.set(project.version.toString())
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
     from(project(":runtime-core").layout.buildDirectory.dir("libs")) {
-        include("knoxbridge-agent-${project.version}.jar", "knoxbridge-agent-${project.version}.jar.sha256")
+        include("knoxbridge-agent-${project.version}.jar", "knoxbridge-agent-${project.version}.jar.sha256", "knoxbridge-agent-${project.version}.jar.knoxsig")
     }
     from(layout.projectDirectory.file("bootstrap-windows/build/knoxbridge-bootstrap.dll")) {
         into("bootstrap-windows")
@@ -123,11 +125,13 @@ tasks.register<Zip>("packageManualInstaller") {
     from(layout.projectDirectory.file("bootstrap-windows/build/knoxbridge-bootstrap.dll.sha256")) {
         into("bootstrap-windows")
     }
+    from(layout.projectDirectory.file("bootstrap-windows/build/knoxbridge-bootstrap.dll.knoxsig")) { into("bootstrap-windows") }
+    from("security") { include("publisher-public.der", "PUBLISHER.md"); into("security") }
     from("scripts") {
         include("setup-unix.sh", "setup-unix.py")
         into("scripts")
     }
-    from(files("docs/INSTALLATION.md", "docs/RELEASE_NOTES.md")) { into("docs") }
+    from(files("docs/INSTALLATION.md", "docs/RELEASE_NOTES.md", "docs/SECURITY_AND_TRUST.md")) { into("docs") }
     from("THIRD_PARTY_NOTICES.md")
     from("LICENSE")
     from("README.md")

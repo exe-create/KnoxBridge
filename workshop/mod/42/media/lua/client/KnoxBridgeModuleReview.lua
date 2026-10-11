@@ -6,7 +6,9 @@ local Review = {}
 local Panel = ISPanel:derive("KnoxBridgeModuleReviewPanel")
 local MANIFEST_FILE = "KnoxBridge/module-review.txt"
 local DECISIONS_FILE = "KnoxBridge/module-decisions.txt"
-local MANIFEST_HEADER = "KNOXBRIDGE-MODULES-2"
+local MANIFEST_HEADER = "KNOXBRIDGE-MODULES-4"
+local SIGNED_MANIFEST_HEADER = "KNOXBRIDGE-MODULES-3"
+local LEGACY_MANIFEST_HEADER = "KNOXBRIDGE-MODULES-2"
 local DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-2"
 local LEGACY_DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-1"
 local DECISIONS_COMMIT = "KNOXBRIDGE-COMMIT-1"
@@ -47,17 +49,25 @@ local function readLines(path)
 end
 
 local function parseManifest(lines)
-    if not lines or lines[1] ~= MANIFEST_HEADER then return nil, "Bridge module list is not available yet." end
+    if not lines or (lines[1] ~= MANIFEST_HEADER and lines[1] ~= SIGNED_MANIFEST_HEADER and lines[1] ~= LEGACY_MANIFEST_HEADER) then
+        return nil, "Bridge module list is not available yet."
+    end
+    local publisherManifest = lines[1] == MANIFEST_HEADER
+    local signedManifest = publisherManifest or lines[1] == SIGNED_MANIFEST_HEADER
     local modules = {}
     for index = 2, #lines do
         if lines[index] ~= "" then
-            local fields = splitTsv(lines[index], 7)
+            local fields = splitTsv(lines[index], publisherManifest and 9 or (signedManifest and 8 or 7))
             if not fields or (fields[3] ~= "" and not validHash(fields[3])) then
                 return nil, "Bridge module list is invalid. No trust changes were written."
             end
+            if signedManifest and fields[8] ~= "" and fields[8] ~= "UNSIGNED" and not validHash(fields[8]) then
+                return nil, "Bridge signer fingerprint is invalid. No trust changes were written."
+            end
             modules[#modules + 1] = {
                 id = fields[1], version = fields[2], hash = fields[3], name = fields[4],
-                author = fields[5], state = fields[6], jarName = fields[7],
+                author = fields[5], state = fields[6], jarName = fields[7], signer = fields[8],
+                publisher = publisherManifest and fields[9] or nil,
             }
         end
     end
@@ -256,10 +266,19 @@ function Panel:createChildren()
     self.stateLabel = ISLabel:new(rightX, 222, 20, "", 0.82, 0.86, 0.88, 1, UIFont.Small, true)
     self.stateLabel:initialise()
     self:addChild(self.stateLabel)
-    self.allowButton = ISButton:new(rightX, 264, rightWidth, 34, "Allow selected JAR", self, self.onAllow)
+    self.signatureLabel = ISLabel:new(rightX, 246, 20, "", 0.82, 0.86, 0.88, 1, UIFont.Small, true)
+    self.signatureLabel:initialise()
+    self:addChild(self.signatureLabel)
+    self.signerLabel1 = ISLabel:new(rightX, 268, 20, "", 0.78, 0.84, 0.88, 1, UIFont.Small, true)
+    self.signerLabel1:initialise()
+    self:addChild(self.signerLabel1)
+    self.signerLabel2 = ISLabel:new(rightX, 290, 20, "", 0.78, 0.84, 0.88, 1, UIFont.Small, true)
+    self.signerLabel2:initialise()
+    self:addChild(self.signerLabel2)
+    self.allowButton = ISButton:new(rightX, 326, rightWidth, 34, "Allow selected JAR", self, self.onAllow)
     self.allowButton:initialise()
     self:addChild(self.allowButton)
-    self.denyButton = ISButton:new(rightX, 306, rightWidth, 34, "Deny selected JAR", self, self.onDeny)
+    self.denyButton = ISButton:new(rightX, 368, rightWidth, 34, "Deny selected JAR", self, self.onDeny)
     self.denyButton:initialise()
     self:addChild(self.denyButton)
     self.rememberButton = ISButton:new(margin, self.height - 52, 240, 34, "[ ] Remember next choice", self, self.onToggleRemember)
@@ -317,6 +336,9 @@ function Panel:showSelection()
         self.hashLabel2:setName("")
         self.idLabel:setName("")
         self.versionLabel:setName("")
+        self.signatureLabel:setName("")
+        self.signerLabel1:setName("")
+        self.signerLabel2:setName("")
         self.stateLabel:setName("Only JARs with a valid Bridge descriptor can be allowed; other JARs remain blocked.")
         self.allowButton:setEnable(false)
         self.denyButton:setEnable(false)
@@ -325,12 +347,19 @@ function Panel:showSelection()
             and (self.restartConfirmRequired and "Confirm quit" or "Quit to apply changes") or "Continue")
         return
     end
-    self.detail:setName("SELECTED JAR: " .. module.jarName .. "  |  " .. module.name .. "  |  " .. module.author .. " (unverified claim)")
+    self.detail:setName("SELECTED JAR: " .. module.jarName .. "  |  " .. module.name .. "  |  Declared author: " .. module.author)
     local hash = module.hash ~= "" and module.hash or "unavailable"
     self.hashLabel1:setName("SHA-256: " .. string.sub(hash, 1, 32))
     self.hashLabel2:setName(string.sub(hash, 33))
     self.idLabel:setName("Module ID: " .. module.id)
     self.versionLabel:setName("Version: " .. module.version)
+    local signed = validHash(module.signer)
+    local knownPublisher = signed and module.publisher and module.publisher ~= ""
+    self.signatureLabel:setName(knownPublisher and ("Verified publisher: " .. module.publisher)
+        or (signed and "Valid signature; compare key with the author's published key."
+        or (module.signer == "UNSIGNED" and "Unsigned module." or "Signature not verified by this runtime.")))
+    self.signerLabel1:setName(signed and ("Key SHA-256: " .. string.sub(module.signer, 1, 32)) or "")
+    self.signerLabel2:setName(signed and string.sub(module.signer, 33) or "")
     local queued = module.hash ~= "" and self.pending[module.hash] or nil
     local queuedDecision = queued and queued.decision or nil
     local queuedMatches = queued and queued.remember == self.rememberChoices

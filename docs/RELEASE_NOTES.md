@@ -1,3 +1,12 @@
+# KnoxBridge Runtime 0.1.0-alpha11
+
+- Adds entry and normal-return hooks with public static callbacks, retaining API version 1 and manual ASM transformations.
+- Adds detached Ed25519 module and release signatures. Invalid present module signatures block loading; unsigned modules retain exact-hash review.
+- Recognizes the permanent .exe publisher key independently of declared author metadata. Signing never automatically approves a module.
+- Adds Windows-account protected owner key setup and verified release signing. Detached signatures are separate from Windows Authenticode.
+- Review UI supports alpha11 publisher records and older alpha10 manifests. KnoxSurvivors requires no update.
+- Isolated native Build 42 startup approval/restart loaded the existing KnoxSurvivors module. Full normal Steam/world gameplay and Unix live acceptance remain outstanding; local staging is not publication.
+
 # KnoxBridge Runtime 0.1.0-alpha2
 
 - Steam Workshop payload is reduced to the dependency marker and default ModTemplate images. Installer and runtime files are distributed separately.
@@ -70,6 +79,8 @@ Install from the [latest GitHub release](https://github.com/exe-create/KnoxBridg
 - Build 42 live verification of the corrected review screen remains required.
 
 # KnoxBridge Runtime 0.1.0-alpha10 source candidate
+- Add `registerHook` for simple entry and normal-return callbacks, preserving return values; keep the raw ASM API for advanced patches. Switch the author example to the convenience API.
+- Add optional detached Ed25519 module signatures, fail-closed invalid-signature handling, signer fingerprints in review manifest v3/UI, and an offline signing/expected-fingerprint verification tool for modules and release artifacts. Signatures do not grant approval. Unsigned modules retain exact-hash review. Load a hash-checked temporary JAR snapshot to prevent source-file substitution during loading. Owner release signing and live Build 42 replay remain pending.
 - Add an author example that performs an observable ASM patch against a harmless fixture; include the pinned ASM Core and Tree 9.10.1 tool dependency in the agent, with third-party notices. The example compiles against ASM as `compileOnly` and does not bundle duplicate tool classes.
 - Add an author task to inspect exact class/method descriptors in a local Project Zomboid JAR and a task to assemble a ready-to-copy example mod layout. Verify the example package omits bundled KnoxBridge API classes.
 - Scope patch registration to the synchronous `initialize` call. Registrations commit only after successful initialization; late, asynchronous, failed-initialization, and duplicate registrations are rejected or discarded instead of being attributed to another module.

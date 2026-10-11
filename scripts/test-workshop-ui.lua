@@ -102,6 +102,14 @@ local manifest = {
     "LegacyMod\tunknown\t" .. string.rep("b", 64) .. "\tLegacy Java Mod\tNot provided\tNOT BRIDGE-COMPATIBLE\tlegacy.jar",
 }
 local modules, err = review.parseManifest(manifest)
+local signedModules = assert(review.parseManifest({ "KNOXBRIDGE-MODULES-3",
+    "signed.module\t1\t" .. hash .. "\tSigned Module\tClaimed Name\tALLOWED\tsigned.jar\t" .. string.rep("c", 64) }))
+assert(signedModules[1].signer == string.rep("c", 64), "signer fingerprint missing")
+assert(not review.parseManifest({ "KNOXBRIDGE-MODULES-3",
+    "signed.module\t1\t" .. hash .. "\tSigned Module\tClaimed Name\tALLOWED\tsigned.jar\tbad-key" }),
+    "malformed signer fingerprint accepted")
+assert(not review.canAllow({ hash = hash, state = "INCOMPATIBLE: INVALID SIGNATURE" }),
+    "invalid signature must remain blocked")
 assert(modules and #modules == 2, err or "expected both enabled JARs in the review list")
 assert(modules[1].jarName == "legacy.jar" or modules[2].jarName == "legacy.jar", "JAR filename missing")
 assert(review.validHash(hash), "valid SHA-256 rejected")
@@ -150,6 +158,7 @@ assert(conflictingQueue == nil, "conflicting duplicate hash must reject the comp
 assert(review.choiceChangesLoadedSet(compatible, "allow"), "new allow must request restart to load the module")
 assert(not review.choiceChangesLoadedSet(compatible, "deny"), "blocking a default-denied module must not request restart")
 assert(not review.choiceChangesLoadedSet({ state = "ALLOWED" }, "allow"), "unchanged allow must not restart")
+assert(not review.choiceChangesLoadedSet(signedModules[1], "allow"), "signed unchanged allow must not restart")
 assert(review.choiceChangesLoadedSet({ state = "ALLOWED" }, "deny"), "denying a loaded module must request restart")
 local pendingUndo = { [hash] = { decision = "allow", remember = false } }
 assert(review.hasPendingChoice(pendingUndo, compatible), "selected JAR should expose undo for its pending choice")
@@ -167,6 +176,11 @@ local secondModule = {
     name = "Second Example", author = "Second Author", state = "BLOCKED BY DEFAULT", jarName = "second.jar",
 }
 local selectionPanel = review.newPanel(0, 0, 1000, 600, { compatible, secondModule }, nil)
+local signedPanel = review.newPanel(0, 0, 1000, 600, signedModules, nil)
+assert(signedPanel.signatureLabel.name:find("Valid signature", 1, true)
+    and signedPanel.signerLabel1.name:find(string.rep("c", 32), 1, true)
+    and signedPanel.signerLabel2.name == string.rep("c", 32), "full signer key must be displayed on two lines")
+assert(not signedPanel.restartRequired, "signed module without pending changes must not require restart")
 assert(selectionPanel.selectedModule == compatible and selectionPanel.moduleList.selected == 1,
     "initial selected module and row must agree")
 assert(selectionPanel.detail.name:find("SELECTED JAR: module.jar", 1, true), "details must identify the selected JAR")
@@ -238,4 +252,11 @@ local gate = review.layout(1920, 1080, true)
 assert(gate.x == 12 and gate.y == 12 and gate.width == 1896 and gate.height == 1056,
     "startup review gate must cover the main menu")
 
-print("KnoxBridge Workshop UI offline checks PASS checks=47")
+local ownerModules = assert(review.parseManifest({
+    "KNOXBRIDGE-MODULES-4",
+    "org.example.owner\t1.0\t" .. hash .. "\tOwner module\tFake metadata\tALLOWED\towner.jar\teda1c49f4f51e604d86c1889fe72f90f16c42ff7bb6c69f1d9be74d79645228f\t.exe",
+}))
+local ownerPanel = review.newPanel(0, 0, 1000, 600, ownerModules, nil)
+assert(ownerPanel.signatureLabel.name == "Verified publisher: .exe", "runtime identity must display separately from metadata")
+assert(ownerPanel.detail.name:find("Fake metadata", 1, true), "declared author remains distinct")
+print("KnoxBridge Workshop UI offline checks PASS")

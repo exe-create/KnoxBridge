@@ -16,13 +16,15 @@ import java.util.regex.Pattern;
 final class ModuleReviewFiles {
     static final String MANIFEST_NAME = "module-review.txt";
     static final String DECISIONS_NAME = "module-decisions.txt";
-    static final String MANIFEST_HEADER = "KNOXBRIDGE-MODULES-2";
+    static final String MANIFEST_HEADER = "KNOXBRIDGE-MODULES-4";
     static final String DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-2";
     private static final String LEGACY_DECISIONS_HEADER = "KNOXBRIDGE-DECISIONS-1";
     static final String DECISIONS_COMMIT = "KNOXBRIDGE-COMMIT-1";
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 
-    record Entry(String id, String version, String hash, String name, String author, String state, String jarName) { }
+    record Entry(String id, String version, String hash, String name, String author, String state, String jarName, String signer) {
+        String publisher() { return PublisherIdentity.name(signer); }
+    }
     private record QueuedDecision(String hash, TrustStore.Decision decision, boolean remember) { }
 
     private ModuleReviewFiles() { }
@@ -90,12 +92,17 @@ final class ModuleReviewFiles {
                 .append(field(entry.name())).append('\t')
                 .append(field(entry.author())).append('\t')
                 .append(field(entry.state())).append('\t')
-                .append(field(entry.jarName())).append('\n');
+                .append(field(entry.jarName())).append('\t').append(field(entry.signer()))
+                .append('\t').append(field(entry.publisher())).append('\n');
         }
         writeAtomically(manifestPath, contents.toString());
     }
 
     static Entry entry(ModuleDiscovery.Candidate candidate, String hash, String state) {
+        return entry(candidate, hash, state, "");
+    }
+
+    static Entry entry(ModuleDiscovery.Candidate candidate, String hash, String state, String signer) {
         Properties info = new Properties();
         Path infoPath = candidate.modRoot().resolve("mod.info");
         if (Files.isRegularFile(infoPath)) {
@@ -107,7 +114,7 @@ final class ModuleReviewFiles {
         String version = descriptor == null ? "unknown" : descriptor.version();
         return new Entry(id, version, hash, fallback(info.getProperty("name"), "Not provided"),
             fallback(info.getProperty("author"), "Not provided"), state,
-            candidate.jar() == null ? "unavailable" : candidate.jar().getFileName().toString());
+            candidate.jar() == null ? "unavailable" : candidate.jar().getFileName().toString(), signer);
     }
 
     static boolean isValidHash(String hash) { return hash != null && SHA256.matcher(hash).matches(); }

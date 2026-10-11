@@ -1,6 +1,6 @@
 param(
     [string]$Installer = (Join-Path $PSScriptRoot '..\bootstrap-windows\build\KnoxBridgeSetup.exe'),
-    [string]$PackageZip = (Join-Path $PSScriptRoot '..\build\distributions\KnoxBridgeRuntime-0.1.0-alpha10.zip')
+    [string]$PackageZip = (Join-Path $PSScriptRoot '..\build\distributions\KnoxBridgeRuntime-0.1.0-alpha11.zip')
 )
 $ErrorActionPreference = 'Stop'
 $installerSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\windows-installer\Program.cs') -Raw
@@ -10,7 +10,8 @@ if ($installerSource -match '(?i)(powershell\.exe|cmd\.exe|CreateProcessW|Proces
 if ($installerSource -match 'Manage module trust') { throw 'Module allow/deny decisions belong to the Bridge in-game UI, not the installer.' }
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
 $zipPath = (Resolve-Path -LiteralPath $PackageZip).Path
-$expected = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()
+$sha = [Security.Cryptography.SHA256]::Create()
+try { $expected = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($zipPath))).Replace('-', '') } finally { $sha.Dispose() }
 $payloadResult = & $installerPath --verify-payload
 if ($LASTEXITCODE -ne 0 -or -not ($payloadResult -match [regex]::Escape("sha256=$expected"))) {
     throw 'The installer embedded payload did not match the verified player archive.'

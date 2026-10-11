@@ -8,7 +8,7 @@ KnoxBridge loads an author's Java module only from a Project Zomboid-enabled mod
 2. Build the supplied standalone example in `examples/minimal-module` using the included Gradle project. With the repository checkout's wrapper, run:
 
    ```powershell
-   ./gradlew -p examples/minimal-module stagePzMod "-PknoxbridgeApiJar=C:/path/to/runtime-api-0.1.0-alpha10.jar"
+   ./gradlew -p examples/minimal-module stagePzMod "-PknoxbridgeApiJar=C:/path/to/runtime-api-0.1.0-alpha11.jar"
    ```
 
    This project requires a Java 17 JDK and Gradle 8.14.3 or newer; Gradle resolves the pinned ASM 9.10.1 compile-time author-tool dependency from Maven Central. The example is also included at `developer/example` in the Workshop payload. From there, run:

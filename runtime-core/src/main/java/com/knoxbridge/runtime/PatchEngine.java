@@ -29,6 +29,12 @@ final class PatchEngine implements ClassFileTransformer {
 
         private Registration(String moduleId) { this.moduleId = moduleId; }
 
+        @Override public void registerHook(Hook hook) {
+            java.util.Objects.requireNonNull(hook, "hook");
+            register(new Patch(hook.patchId(), hook.target(), hook.required(),
+                new MethodHooks(hook)));
+        }
+
         @Override public void register(Patch patch) {
             java.util.Objects.requireNonNull(patch, "patch");
             synchronized (PatchEngine.this) {
@@ -95,6 +101,7 @@ final class PatchEngine implements ClassFileTransformer {
                         + " target=" + patch.target() + " reason=ambiguous-method");
                     continue;
                 }
+                if (patch.transformer() instanceof MethodHooks hooks) hooks.validateCallbacks(loader);
                 byte[] changed = patch.transformer().transform(className, current.clone());
                 if (changed != null) {
                     if (java.util.Arrays.equals(changed, current)) {

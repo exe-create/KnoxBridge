@@ -9,10 +9,14 @@ if (!(Test-Path -LiteralPath $bridgeArtwork)) {
     throw "KnoxBridge Workshop artwork not found: $bridgeArtwork"
 }
 $stage = [IO.Path]::GetFullPath($WorkshopDirectory)
+$workshopRoot = [IO.Path]::GetFullPath((Join-Path $env:USERPROFILE 'Zomboid\Workshop')).TrimEnd('\')
+if (!$stage.StartsWith($workshopRoot + '\', [StringComparison]::OrdinalIgnoreCase) -or (Split-Path -Leaf $stage) -ne 'KnoxBridgeRuntime') { throw 'Stage must be the KnoxBridgeRuntime directory under the user Workshop directory' }
+if ((Test-Path -LiteralPath $stage) -and ((Get-Item -LiteralPath $stage).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Workshop stage must not be a junction' }
 if (Test-Path -LiteralPath $stage) {
     $backupRoot = Join-Path $env:USERPROFILE 'Zomboid\WorkshopBackups'
     New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
     $backup = Join-Path $backupRoot ('KnoxBridgeRuntime-before-marker-only-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    if (![IO.Path]::GetFullPath($backup).StartsWith([IO.Path]::GetFullPath($backupRoot).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid backup target' }
     Move-Item -LiteralPath $stage -Destination $backup
     Write-Output "Previous Workshop staging preserved at $backup"
 }
@@ -44,6 +48,8 @@ if (!(Test-Path -LiteralPath $apiJar)) {
 }
 if (!(Test-Path -LiteralPath $apiJar)) { throw "Runtime API JAR not found: $apiJar" }
 Copy-Item -LiteralPath $apiJar -Destination $developerLib
+Copy-Item -LiteralPath ($apiJar + '.knoxsig') -Destination $developerLib
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\security\publisher-public.der') -Destination $developerRoot
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\LICENSE') -Destination $developerRoot
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\THIRD_PARTY_NOTICES.md') -Destination $developerRoot
 $exampleSource = Join-Path $PSScriptRoot '..\examples\minimal-module'
@@ -63,7 +69,7 @@ foreach ($relativePath in $exampleSourceFiles) {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationFile) | Out-Null
     Copy-Item -LiteralPath (Join-Path $exampleSource $relativePath) -Destination $destinationFile
 }
-foreach ($guide in @('MODULE_API.md', 'PATCH_API.md', 'COMPATIBILITY.md', 'INSTALLATION.md')) {
+foreach ($guide in @('MODULE_API.md', 'PATCH_API.md', 'COMPATIBILITY.md', 'INSTALLATION.md', 'SECURITY_AND_TRUST.md')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "..\docs\$guide") -Destination $developerDocs
 }
 $quickStart = @"
@@ -92,12 +98,15 @@ MOD AUTHOR QUICK START
 - Use developer/docs/PATCH_API.md for patch contracts and developer/docs/COMPATIBILITY.md for verified boundaries.
 - KnoxBridge does not make arbitrary Java mods compatible automatically; the mod author must integrate with its API and test against the target Project Zomboid build.
 
+SIGNING
+Alpha11 supports detached Ed25519 signatures and entry/normal-return hooks. Follow developer/docs/SECURITY_AND_TRUST.md for author key generation, signing and verification. A verified publisher is anchored to the runtime's public-key registry; declaring a name does not verify identity. Signature verification never skips exact-JAR approval. Existing unsigned modules remain compatible.
+
 TRUST AND SAFETY
 Java modules run with the game's account permissions and are not sandboxed. Approve only modules you trust. The author text in mod.info is a claim, not authenticated identity. KnoxBridge's runtime and API are maintained as independent project components.
 "@
 [IO.File]::WriteAllText((Join-Path $modRoot 'README.txt'), $quickStart, [Text.UTF8Encoding]::new($false))
 $idLine = if ($WorkshopItemId) { "id=$WorkshopItemId`n" } else { '' }
-$description = "KnoxBridge Runtime is the required PZ dependency marker for Knox Survivors Java features. This author toolkit is version $version and must be paired with the matching player runtime from GitHub Releases; do not publish a mismatched Workshop/runtime pair. The Workshop item includes the Bridge-owned in-game Java mod review gate, API, and mod-author guides; it does not install the Java runtime. Download player setup from https://github.com/exe-create/KnoxBridge/releases/latest. Enable KnoxBridge Runtime and Knox Survivors in the PZ Mods menu. The full-screen Review Java Mods gate lists enabled-mod JARs at the main menu before world entry. The highlighted row and selected-JAR details show which file Allow/Deny applies to. Unknown hashes remain blocked by default. Choices use the exact SHA-256. Remember next choice applies to one saved choice, then resets; unchecked choices apply for one launch and restore any prior remembered decision. Undo removes a queued choice. When choices change the loaded modules, the screen warns and confirms before quitting to desktop; restart PZ through Steam manually. KnoxBridge does not auto-relaunch. Only modules with a valid KnoxBridge descriptor/API can be allowed; authors must add compatibility. Displayed author metadata is unverified. Windows: run KnoxBridgeSetup.exe. Linux/macOS: extract the ZIP, copy the agent JAR to ~/.knoxbridge/, and append the -javaagent line to Steam Launch Options (no Python needed; see developer/docs/INSTALLATION.md; these platforms are not live-verified). An unsigned new installer may show a SmartScreen not-commonly-downloaded reputation warning; this is not a malware verdict or proof of safety. Verify the official source and release hash. If Windows Security identifies malware, stop and do not run or whitelist it. Configure only one Java instrumentation runtime for Project Zomboid at a time. Java modules have the same permissions as the game and are not sandboxed; approve only code you trust."
+$description = "KnoxBridge Runtime is the required PZ dependency marker for Knox Survivors Java features. This author toolkit is version $version and must be paired with the matching player runtime from GitHub Releases; do not publish a mismatched Workshop/runtime pair. The Workshop item includes the Bridge-owned in-game Java mod review gate, API, and mod-author guides; it does not install the Java runtime. Download player setup from https://github.com/exe-create/KnoxBridge/releases/latest. Enable KnoxBridge Runtime and Knox Survivors in the PZ Mods menu. The full-screen Review Java Mods gate lists enabled-mod JARs at the main menu before world entry. The highlighted row and selected-JAR details show which file Allow/Deny applies to. Unknown hashes remain blocked by default. Choices use the exact SHA-256. Remember next choice applies to one saved choice, then resets; unchecked choices apply for one launch and restore any prior remembered decision. Undo removes a queued choice. When choices change the loaded modules, the screen warns and confirms before quitting to desktop; restart PZ through Steam manually. KnoxBridge does not auto-relaunch. Only modules with a valid KnoxBridge descriptor/API can be allowed; authors must add compatibility. Declared author metadata is a claim. Alpha11 verifies detached module signatures and recognizes independently anchored publisher keys; approval still applies to each exact JAR. See developer/docs/SECURITY_AND_TRUST.md. Windows: run KnoxBridgeSetup.exe. Linux/macOS: extract the ZIP, copy the agent JAR to ~/.knoxbridge/, and append the -javaagent line to Steam Launch Options (no Python needed; see developer/docs/INSTALLATION.md; these platforms are not live-verified). An unsigned new installer may show a SmartScreen not-commonly-downloaded reputation warning; this is not a malware verdict or proof of safety. Verify the official source and release hash. If Windows Security identifies malware, stop and do not run or whitelist it. Configure only one Java instrumentation runtime for Project Zomboid at a time. Java modules have the same permissions as the game and are not sandboxed; approve only code you trust."
 $workshop = "version=1`n${idLine}title=KnoxBridge Runtime (Required by Knox Survivors)`ndescription=$description`ntags=Build 42`nvisibility=public`n"
 [IO.File]::WriteAllText((Join-Path $stage 'workshop.txt'), $workshop, [Text.UTF8Encoding]::new($false))
 $expected = @(
@@ -110,12 +119,15 @@ $expected = @(
     'mods\KnoxBridgeRuntime\42\media\ui\knoxKofi.png',
     'mods\KnoxBridgeRuntime\README.txt',
     "mods\KnoxBridgeRuntime\developer\lib\runtime-api-$version.jar",
+    "mods\KnoxBridgeRuntime\developer\lib\runtime-api-$version.jar.knoxsig",
+    'mods\KnoxBridgeRuntime\developer\publisher-public.der',
     'mods\KnoxBridgeRuntime\developer\LICENSE',
     'mods\KnoxBridgeRuntime\developer\THIRD_PARTY_NOTICES.md',
     'mods\KnoxBridgeRuntime\developer\docs\MODULE_API.md',
     'mods\KnoxBridgeRuntime\developer\docs\PATCH_API.md',
     'mods\KnoxBridgeRuntime\developer\docs\COMPATIBILITY.md',
     'mods\KnoxBridgeRuntime\developer\docs\INSTALLATION.md',
+    'mods\KnoxBridgeRuntime\developer\docs\SECURITY_AND_TRUST.md',
     'mods\KnoxBridgeRuntime\developer\example\build.gradle.kts',
     'mods\KnoxBridgeRuntime\developer\example\settings.gradle.kts',
     'mods\KnoxBridgeRuntime\developer\example\knoxbridge.properties',

@@ -14,7 +14,7 @@ import java.lang.management.ManagementFactory;
 /** Early JVM bootstrap and PZ-specific adapter owner. */
 public final class KnoxBridgeAgent {
     private static final String VERSION = KnoxBridgeAgent.class.getPackage().getImplementationVersion() == null
-        ? "0.1.0-alpha10" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
+        ? "0.1.0-alpha11" : KnoxBridgeAgent.class.getPackage().getImplementationVersion();
     private static final AtomicBoolean STARTED = new AtomicBoolean();
     private static final AtomicBoolean MODULES_STARTED = new AtomicBoolean();
     private static final List<ModuleLoader.LoadedModule> LOADED = new CopyOnWriteArrayList<>();
@@ -148,23 +148,34 @@ public final class KnoxBridgeAgent {
                     reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "INCOMPATIBLE: API version"));
                     continue;
                 }
+                String signer;
+                try {
+                    signer = DetachedSignature.verify(d.jar(), DetachedSignature.moduleContext(d, candidate.modRoot()), hash);
+                } catch (Exception invalidSignature) {
+                    log.write("module blocked id=" + d.id() + " reason=invalid-signature error=" + invalidSignature);
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "INCOMPATIBLE: INVALID SIGNATURE"));
+                    continue;
+                }
+                String provenance = signer == null ? " / UNSIGNED" : " / VALID SIGNATURE; key SHA-256=" + signer
+                    + " (compare with publisher; identity unverified)";
+                log.write("module provenance id=" + d.id() + provenance);
                 TrustStore.Decision decision = trust.check(hash);
                 if (decision == TrustStore.Decision.APPROVAL_REQUIRED) {
                     log.write("module blocked id=" + d.id() + " decision=" + decision);
-                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "BLOCKED BY DEFAULT"));
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "BLOCKED BY DEFAULT", signer == null ? "UNSIGNED" : signer));
                     continue;
                 }
                 if (decision == TrustStore.Decision.DENY_ONCE || decision == TrustStore.Decision.DENY_EXACT) {
                     log.write("module blocked id=" + d.id() + " decision=" + decision);
-                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "DENIED"));
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "DENIED", signer == null ? "UNSIGNED" : signer));
                     continue;
                 }
                 try {
-                    LOADED.add(ModuleLoader.load(d, d.jar(), VERSION, patchEngine, instrumentation, log::write));
-                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "ALLOWED"));
+                    LOADED.add(ModuleLoader.load(d, d.jar(), VERSION, patchEngine, instrumentation, log::write, hash));
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "ALLOWED", signer == null ? "UNSIGNED" : signer));
                 } catch (Throwable failure) {
                     log.write("module failed id=" + d.id() + " reason=" + failure);
-                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "LOAD FAILED"));
+                    reviewEntries.add(ModuleReviewFiles.entry(candidate, hash, "LOAD FAILED", signer == null ? "UNSIGNED" : signer));
                 }
             } catch (Throwable failure) {
                 log.write("module failed id=" + d.id() + " reason=" + failure);

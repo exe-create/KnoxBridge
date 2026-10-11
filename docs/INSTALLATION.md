@@ -1,6 +1,6 @@
 # Player setup
 
-**Release note:** The full-screen startup review gate and optional remember choices are in the alpha10 source candidate (the gate correction is recorded in alpha9 history). They require a matching KnoxBridge runtime package and Workshop payload. Knox Survivors does not need a runtime code update for this feature.
+**Release note:** The full-screen startup review gate and optional remember choices are included in alpha11 together with optional digital signatures and entry/normal-return hooks (the gate correction is recorded in alpha9 history). They require a matching KnoxBridge runtime package and Workshop payload. Knox Survivors does not need a runtime code update for this feature.
 
 KnoxBridge has a Steam Workshop dependency marker and a separate player setup download. The Workshop item carries PZ metadata, the compile-time API JAR, and concise player/mod-author guides; it does not install or activate the runtime. Download player setup from [KnoxBridge GitHub Releases](https://github.com/exe-create/KnoxBridge/releases/latest). The separate Knox Survivors Launcher is deprecated and unsupported. Do not download or use its old releases, or combine it or a direct legacy Knox agent with KnoxBridge.
 
@@ -35,7 +35,7 @@ No Python, terminal scripting, or Steam config editing is required. You copy one
 2. Download and extract `KnoxBridgeRuntime-*.zip` from GitHub Releases.
 3. Copy `knoxbridge-agent-*.jar` from the extracted archive into a new folder called `.knoxbridge` in your home directory, so the path is `~/.knoxbridge/knoxbridge-agent-*.jar` (use the exact versioned filename from your download).
 4. In Steam, right-click Project Zomboid → Properties → Launch Options, and append this text after anything already there (keep existing text; the trailing `--` is mandatory):
-   `-javaagent:"$HOME/.knoxbridge/knoxbridge-agent-0.1.0-alpha10.jar" --`
+   `-javaagent:"$HOME/.knoxbridge/knoxbridge-agent-0.1.0-alpha11.jar" --`
    Replace the version with the one you downloaded if it differs.
 5. Enable **KnoxBridge Runtime** and Knox Survivors in the PZ Mods menu, and start normally through Steam.
 6. At the PZ main menu, review enabled-mod JARs in the full-screen gate before entering a world. Unknown JARs remain blocked unless allowed. Leave **Remember next choice** unchecked for a one-launch decision or check it to remember the next exact-hash choice; the toggle resets after that saved choice. If you change a queued decision before continuing, use **Undo pending choice**. If choices change which modules load, the gate asks for confirmation before quitting; then start PZ again through Steam. KnoxBridge does not automatically relaunch the game. If the file bridge cannot be used, leave the module blocked and report the problem.
@@ -59,3 +59,5 @@ Run `scripts/stage-workshop.ps1` on Windows to prepare the KnoxBridge Workshop i
 - **Real PZ 42.21 verified on the prior runtime build:** Windows normal Steam startup, enabled-mod discovery, unknown-hash block, approved module load, and restore/uninstall/reinstall. The current Bridge Workshop menu, enabled-JAR inventory, next-launch allow/deny queue, alpha10 Windows package, and normal no-installer trust flow still need fresh Build 42 replay.
 - **Unix setup implemented, not live verified:** Linux/macOS Steam config editing and direct Java-agent launch path.
 - **Knox module verified:** required Knox hooks and bridge were observed in a live Windows process; movement/combat and persistence still have remaining live acceptance.
+
+Alpha11 downloads include detached `.knoxsig` files and the public key. See [Security and trust](SECURITY_AND_TRUST.md) for the permanent publisher fingerprint and verification commands. The Windows installer continues to use bundled SHA-256 integrity checks; detached signatures require separate verification and do not change Windows Authenticode prompts. KnoxSurvivors can remain on its current unsigned release.

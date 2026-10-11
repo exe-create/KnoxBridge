@@ -27,7 +27,7 @@ Building the runtime requires Java 17 or newer. The self-contained Windows insta
 ./gradlew packageRuntime
 ```
 
-The player archive is written to `build/distributions/KnoxBridgeRuntime-0.1.0-alpha10.zip`; the Windows installer is `bootstrap-windows/build/KnoxBridgeSetup.exe`. `packageRuntime` creates a developer/test archive with the independent fixtures and minimal author example. For detailed checks and live-vs-offline acceptance, see [Development and acceptance](docs/DEVELOPMENT_TESTING.md).
+The player archive is written to `build/distributions/KnoxBridgeRuntime-0.1.0-alpha11.zip`; the Windows installer is `bootstrap-windows/build/KnoxBridgeSetup.exe`. `packageRuntime` creates a developer/test archive with the independent fixtures and minimal author example. For detailed checks and live-vs-offline acceptance, see [Development and acceptance](docs/DEVELOPMENT_TESTING.md).
 
 ## Repository map
 

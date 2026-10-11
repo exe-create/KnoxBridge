@@ -22,6 +22,8 @@ local.properties
 *.pfx
 *.keystore
 *.jks
+*.pk8
+*.dpapi
 
 # Local runtime/install state
 .knoxbridge/

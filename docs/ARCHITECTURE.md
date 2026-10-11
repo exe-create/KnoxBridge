@@ -20,7 +20,11 @@ JAR SHA-256 is the trust identity. Unknown hashes are blocked by default. The Br
 
 ## Patches
 
-The patch engine validates exact class/method targets and requires a unique target when no descriptor is provided. Module code supplies the actual transformation. The runtime does not guess overloaded targets or guarantee that patch code remains semantically correct after a PZ update.
+The patch engine validates exact class/method targets and requires a unique target when no descriptor is provided. `registerHook` supplies simple public static no-argument callbacks at entry and normal return; advanced authors can still provide their own ASM transform. The runtime does not guess overloads or guarantee semantic compatibility after a PZ update. Exceptional exits and argument/result binding require a raw transform.
+
+Optional Ed25519 `.knoxsig` sidecars bind module metadata and exact JAR bytes. Invalid present signatures block loading before hash approval is consulted; valid signatures identify a public-key fingerprint without granting publisher trust or approval. Module loading copies the JAR to a temporary snapshot and checks its hash against the reviewed bytes before executing code. The review handoff uses manifest version 4 with separate signer and runtime-anchored publisher fields; the Lua UI also accepts versions 2 and 3 from older agents. See `SECURITY_AND_TRUST.md` for format, key lifecycle, and release-artifact signing.
+
+Modules must be self-contained in the declared JAR (apart from runtime/game APIs); resources inside it remain available. The snapshot is the code-source location, so modules must not rely on neighboring files or external manifest `Class-Path` dependency JARs. Unsupported companion JARs remain inventory entries, never approved module dependencies. Signatures cover the declared JAR and descriptor context, not arbitrary external code or data read by a trusted module.
 
 Knox's 42.21 module reported its required combat and visibility hooks ready, exposed `KnoxJavaBridge`, and later logged a native NPC probe spawn, movement transitions, bat attacks, and zombie health reaching zero. A stuck movement route was also recorded. These are narrow live runtime/hook results, not full gameplay, pathing, awareness, or persistence acceptance.
 

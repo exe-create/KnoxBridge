@@ -11,17 +11,27 @@ import java.util.function.Consumer;
 final class ModuleLoader {
     static LoadedModule load(ModuleDescriptor d, Path jar, String runtimeVersion, PatchEngine patches,
             Instrumentation instrumentation, Consumer<String> log) throws Exception {
+        return load(d, jar, runtimeVersion, patches, instrumentation, log, Hashing.sha256(jar));
+    }
+
+    static LoadedModule load(ModuleDescriptor d, Path jar, String runtimeVersion, PatchEngine patches,
+            Instrumentation instrumentation, Consumer<String> log, String approvedHash) throws Exception {
         JarFile systemJar = null;
         URLClassLoader isolatedLoader = null;
+        Path snapshotRoot = java.nio.file.Files.createTempDirectory("knoxbridge-module-");
+        Path snapshot = snapshotRoot.resolve(jar.getFileName());
         try {
+            java.nio.file.Files.copy(jar, snapshot);
+            if (!Hashing.sha256(snapshot).equals(approvedHash))
+                throw new SecurityException("module JAR changed after approval/signature verification");
             ClassLoader classLoader;
             if (d.classLoader().equals("system")) {
-                systemJar = new JarFile(jar.toFile());
+                systemJar = new JarFile(snapshot.toFile());
                 instrumentation.appendToSystemClassLoaderSearch(systemJar);
                 classLoader = ClassLoader.getSystemClassLoader();
                 log.accept("module classloader policy=system id=" + d.id());
             } else {
-                isolatedLoader = new URLClassLoader(new java.net.URL[] { jar.toUri().toURL() }, ModuleLoader.class.getClassLoader());
+                isolatedLoader = new URLClassLoader(new java.net.URL[] { snapshot.toUri().toURL() }, ModuleLoader.class.getClassLoader());
                 classLoader = isolatedLoader;
             }
             Class<?> type = Class.forName(d.entrypoint(), true, classLoader);
@@ -39,20 +49,26 @@ final class ModuleLoader {
                 patchRegistration.commit();
             }
             log.accept("module loaded id=" + d.id() + " version=" + d.version());
-            return new LoadedModule(module, isolatedLoader, systemJar);
+            snapshotRoot.toFile().deleteOnExit();
+            snapshot.toFile().deleteOnExit();
+            return new LoadedModule(module, isolatedLoader, systemJar, snapshot);
         } catch (Exception | Error e) {
             if (isolatedLoader != null) isolatedLoader.close();
             if (systemJar != null) systemJar.close();
+            java.nio.file.Files.deleteIfExists(snapshot);
+            java.nio.file.Files.deleteIfExists(snapshotRoot);
             throw e;
         }
     }
 
-    record LoadedModule(KnoxModule module, URLClassLoader loader, JarFile systemJar) implements AutoCloseable {
+    record LoadedModule(KnoxModule module, URLClassLoader loader, JarFile systemJar, Path snapshot) implements AutoCloseable {
         @Override public void close() throws Exception {
             try { module.shutdown(); }
             finally {
                 if (loader != null) loader.close();
                 if (systemJar != null) systemJar.close();
+                java.nio.file.Files.deleteIfExists(snapshot);
+                java.nio.file.Files.deleteIfExists(snapshot.getParent());
             }
         }
     }

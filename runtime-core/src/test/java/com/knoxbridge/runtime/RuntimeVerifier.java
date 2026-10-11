@@ -8,6 +8,9 @@ import java.util.List;
 public final class RuntimeVerifier {
     private static int checks;
     public static void main(String[] args) throws Exception {
+        check(PublisherIdentity.name("eda1c49f4f51e604d86c1889fe72f90f16c42ff7bb6c69f1d9be74d79645228f").equals(".exe"), "trusted runtime anchors publisher identity");
+        check(PublisherIdentity.name("c".repeat(64)).isEmpty() && PublisherIdentity.name(".exe").isEmpty()
+            && PublisherIdentity.name("UNSIGNED").isEmpty(), "unknown keys and metadata cannot claim verified publisher");
         Path temp = Files.createTempDirectory("knoxbridge-verify-");
         Path mod = Files.createDirectories(temp.resolve("enabled-mod"));
         Path moduleJar = Path.of(System.getProperty("knoxbridge.testModuleJar"));
@@ -43,10 +46,10 @@ public final class RuntimeVerifier {
         Path manifest = temp.resolve("Lua/KnoxBridge/module-review.txt");
         ModuleReviewFiles.writeManifest(manifest, List.of(
             new ModuleReviewFiles.Entry("org.example.knoxbridge.greeting", "1.0", hash,
-                "Example\tJava Mod", "Example Author", "BLOCKED BY DEFAULT", "example.jar")));
+                "Example\tJava Mod", "Example Author", "BLOCKED BY DEFAULT", "example.jar", "UNSIGNED")));
         List<String> manifestLines = Files.readAllLines(manifest);
         check(manifestLines.get(0).equals(ModuleReviewFiles.MANIFEST_HEADER)
-                && manifestLines.get(1).split("\\t", -1).length == 7
+                && manifestLines.get(1).split("\\t", -1).length == 9
                 && !manifestLines.get(1).contains("Example\tJava"),
             "review manifest is versioned and metadata cannot inject fields");
         Path trustQueueStorePath = temp.resolve("review-queue-trust.properties");
@@ -184,8 +187,18 @@ public final class RuntimeVerifier {
             check(patchedBytes != null, "standalone author patch transforms its exact fixture target");
             Class<?> patchedType = new ByteArrayClassLoader(loaded.loader()).define("org.example.mymod.ExampleGreeting", patchedBytes);
             Object patchedFixture = patchedType.getConstructor().newInstance();
-            check(patchedType.getMethod("greeting").invoke(patchedFixture).equals("greeting changed by a KnoxBridge patch"),
-                "standalone author patch produces observable behavior");
+            java.io.ByteArrayOutputStream adviceOutput = new java.io.ByteArrayOutputStream();
+            java.io.PrintStream previousOutput = System.out;
+            try {
+                System.setOut(new java.io.PrintStream(adviceOutput, true, java.nio.charset.StandardCharsets.UTF_8));
+                check(patchedType.getMethod("greeting").invoke(patchedFixture).equals("original greeting"),
+                    "standalone entry/exit advice preserves the original method result");
+            } finally {
+                System.setOut(previousOutput);
+            }
+            check(adviceOutput.toString(java.nio.charset.StandardCharsets.UTF_8).contains("enter greeting")
+                && adviceOutput.toString(java.nio.charset.StandardCharsets.UTF_8).contains("exit greeting"),
+                "standalone author advice executes on method entry and normal exit");
             check(authorLog.stream().anyMatch(s -> s.contains("patch PASS module=org.example.mymod")
                 && s.contains("methodName=greeting") && s.contains("descriptor=()Ljava/lang/String;")),
                 "author patch diagnostic reports exact target");
@@ -311,6 +324,7 @@ public final class RuntimeVerifier {
         check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-agentlib:exampleRuntime")), "native instrumentation conflict detected");
         check(KnoxBridgeAgent.hasCompetingBootstrap(List.of("-javaagent:another-runtime.jar")), "competing Java agent conflict detected");
         check(!KnoxBridgeAgent.hasCompetingBootstrap(List.of("-javaagent:C:/game/.knoxbridge/knoxbridge-agent.jar")), "KnoxBridge agent not treated as foreign");
+        checks += AuthorFeaturesVerifier.verify(temp, moduleCandidate.descriptor(), mod);
         System.out.println("KnoxBridge offline verification PASS checks=" + checks);
     }
 
